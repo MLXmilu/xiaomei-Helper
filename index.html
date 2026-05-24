@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://www.meituan.com/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="美团周末管家 (Super Agent) - 本地场景短时活动智能规划与一键执行智能体。通过解析多维隐式约束（如孩子5岁、老婆减肥、聚会社交），动态优化出一条吃喝玩乐下午行程链，全链路闭环门票预订、餐厅订座排号、美团闪购配送，帮你把事情彻底做完。" />
+    <title>美团周末管家 - 本地短时活动规划与执行智能体 (Super Agent)</title>
+    <!-- 高德地图 API 安全密钥与 SDK 动态注入 -->
+    <script type="text/javascript">
+      window._AMapSecurityConfig = {
+        securityJsCode: "bfe5f17b2c531aae96e3c76b44639d04",
+      };
+    </script>
+    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=7a419b1e8b98457206ae3b72ed4fcb31&plugin=AMap.Driving,AMap.Riding,AMap.Walking,AMap.PlaceSearch"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
