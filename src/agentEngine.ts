@@ -103,6 +103,22 @@ export function estimateTravelTime(distanceKm: number): { duration: number; mode
 // ==========================================
 import { AI_CONFIG } from './config';
 
+// 鲁棒的JSON提取器，能从任何混杂杂质的字符串中精准提取首尾匹配的JSON格式
+export function extractPureJSON(text: string): string {
+  // 1. 优先提取 Markdown 格式代码块中的内容
+  const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (markdownMatch && markdownMatch[1]) {
+    text = markdownMatch[1].trim();
+  }
+  // 2. 截取第一个大括号 { 与最后一个大括号 } 之间的内容
+  const firstBrace = text.indexOf('{');
+  const lastBrace = text.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    return text.substring(firstBrace, lastBrace + 1).trim();
+  }
+  return text.trim();
+}
+
 export async function parseNaturalLanguageQuery(
   query: string, 
   useAi: boolean = true,
@@ -256,7 +272,7 @@ export async function parseNaturalLanguageQuery(
   // B. 尝试利用用户配置的大模型接口进行语义结构化抽取 (流式输出版)
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 既然是流式，将总超时放宽到 25 秒
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 既然是流式，将总超时放宽到 60 秒
 
     // 智能拼接 baseUrl，保证不管是相对路径还是绝对路径均能完美拼接
     let url = AI_CONFIG.baseURL;
@@ -280,7 +296,7 @@ export async function parseNaturalLanguageQuery(
         messages: [
           {
             role: "system",
-            content: `你是一个智能周末出行管家小美的语义提取与地标规划助手。请精准解析用户的周末出行心愿，提取结构化参数，并根据用户的描述进行自由的地标/商户推荐与高德经纬度坐标预测。必须严格以简洁的 JSON 格式输出，不要包含任何 markdown 代码块格式（如 \`\`\`json），也不要带任何文字解释！
+            content: `你是一个智能周末出行管家小美的语义提取与地标规划助手。请精准解析用户的周末出行心愿，提取结构化参数，并根据用户的描述进行自由的地标/商户推荐与高德经纬度坐标预测。必须严格以简洁的 JSON 格式输出，不要包含 any markdown 代码块格式（如 \`\`\`json），也不要带任何文字解释！
 
 输出的 JSON 结构必须为：
 {
@@ -323,6 +339,7 @@ export async function parseNaturalLanguageQuery(
     const decoder = new TextDecoder("utf-8");
     let buffer = "";
     let completeText = "";
+    let reasoningText = "";
 
     while (true) {
       const { done, value } = await reader.read();
@@ -341,10 +358,23 @@ export async function parseNaturalLanguageQuery(
             const dataJson = JSON.parse(trimmed.slice(6));
             const choice = dataJson.choices?.[0];
             const contentChunk = choice?.delta?.content || choice?.text || "";
+            const reasoningChunk = choice?.delta?.reasoning_content || "";
+
+            let hasUpdated = false;
+            if (reasoningChunk) {
+              reasoningText += reasoningChunk;
+              hasUpdated = true;
+            }
             if (contentChunk) {
               completeText += contentChunk;
-              if (onStreamChunk) {
+              hasUpdated = true;
+            }
+
+            if (hasUpdated && onStreamChunk) {
+              if (completeText) {
                 onStreamChunk(completeText);
+              } else {
+                onStreamChunk(`🤔 正在深度规划中：\n${reasoningText}`);
               }
             }
           } catch (e) {
@@ -354,12 +384,7 @@ export async function parseNaturalLanguageQuery(
       }
     }
 
-    let jsonString = completeText.trim();
-    const markdownMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (markdownMatch) {
-      jsonString = markdownMatch[1].trim();
-    }
-
+    const jsonString = extractPureJSON(completeText);
     const parsedData = JSON.parse(jsonString);
     clearTimeout(timeoutId);
 

@@ -188,8 +188,8 @@ export default function App() {
 
     try {
       const parsed = await parseNaturalLanguageQuery(targetQuery, activeAi, (streamText) => {
-        // 滤除可能吐出的 ```json 语法标记，保证展示气泡的圆润美观与纯净
-        const cleanText = streamText.replace(/```json|```/g, '').trim();
+        // 滤除可能吐出的 ```json 语法标记，如果是思维链则直接保留以呈现圆润的思考动态
+        const cleanText = streamText.startsWith("🤔") ? streamText : streamText.replace(/```json|```/g, '').trim();
         setLogs([
           { 
             timestamp: new Date().toLocaleTimeString(), 
