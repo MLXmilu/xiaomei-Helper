@@ -163,8 +163,8 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
           }, 100);
         }
 
-        // C. 使用“两阶段高鲁棒画线引擎”遍历两点连线
-        window.AMap.plugin(['AMap.Walking', 'AMap.Riding'], () => {
+        // C. 使用“三阶段高精度路网划线引擎”遍历两点连线，支持打车/骑行/步行/地铁
+        window.AMap.plugin(['AMap.Walking', 'AMap.Riding', 'AMap.Transfer'], () => {
           for (let i = 0; i < activeItems.length - 1; i++) {
             const startPos = activeItems[i].node.position || [116.473551, 39.957018];
             const endPos = activeItems[i + 1].node.position || [116.479133, 39.953049];
@@ -184,10 +184,12 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
             fallbackLine.setMap(mapInstance);
             routesRef.current.push(fallbackLine);
 
-            // 第二阶段：如果是短距离同城（如5公里内），尝试调用高德真实物理路网进行沿马路高精度覆盖
+            // 第二阶段：调用高德真实物理路网进行沿马路高精度覆盖 (步行/打车/骑行/地铁)
             const dist = Math.sqrt(Math.pow(startPos[0] - endPos[0], 2) + Math.pow(startPos[1] - endPos[1], 2)) * 100; // 粗略转换公里
-            if (dist < 6) {
+            if (dist < 60) { // 放宽到 60 公里内均支持官方真实路网规划
               const isWalking = activeItems[i].travelModeToNext === 'walk';
+              const isSubway = activeItems[i].travelModeToNext === 'subway';
+              
               if (isWalking) {
                 const walking = new window.AMap.Walking({
                   map: mapInstance,
@@ -200,6 +202,21 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
                   if (status === 'complete') {
                     fallbackLine.setMap(null); // 隐藏直连线，显示真实路网
                     routesRef.current.push(walking);
+                  }
+                });
+              } else if (isSubway) {
+                // 调用高德官方 AMap.Transfer 进行真实的公交/地铁划线
+                const transfer = new window.AMap.Transfer({
+                  map: mapInstance,
+                  city: '北京市',
+                  hideMarkers: true,
+                  autoFitView: false,
+                  policy: window.AMap.TransferPolicy.LEAST_TIME
+                });
+                transfer.search(startPos, endPos, (status: string) => {
+                  if (status === 'complete') {
+                    fallbackLine.setMap(null);
+                    routesRef.current.push(transfer);
                   }
                 });
               } else {

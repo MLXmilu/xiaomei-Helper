@@ -122,7 +122,8 @@ export function extractPureJSON(text: string): string {
 export async function parseNaturalLanguageQuery(
   query: string, 
   useAi: boolean = true,
-  onStreamChunk?: (text: string) => void
+  onStreamChunk?: (text: string) => void,
+  abortSignal?: AbortSignal
 ): Promise<AppConstraints> {
   const lowercase = query.toLowerCase();
   
@@ -274,6 +275,17 @@ export async function parseNaturalLanguageQuery(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 既然是流式，将总超时放宽到 60 秒
 
+    // 联动外部中断信号，如果用户在前台点击“停止思考”，则瞬间终止底层的 fetch 流式连接
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        controller.abort();
+      } else {
+        abortSignal.addEventListener('abort', () => {
+          controller.abort();
+        });
+      }
+    }
+
     // 智能拼接 baseUrl，保证不管是相对路径还是绝对路径均能完美拼接
     let url = AI_CONFIG.baseURL;
     if (url.endsWith('/')) {
@@ -416,7 +428,11 @@ export async function parseNaturalLanguageQuery(
       throw new Error("No nodes found in AI response");
     }
 
-  } catch (err) {
+  } catch (err: any) {
+    // 若是由于用户手动“停止思考”触发的中断，直接向上抛出 AbortError，坚决不进行本地降级兜底
+    if (err.name === 'AbortError' || (abortSignal && abortSignal.aborted)) {
+      throw err;
+    }
     console.error("AI service error, fallback to local:", err);
     return localFallback();
   }

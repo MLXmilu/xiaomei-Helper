@@ -65,6 +65,7 @@ export default function App() {
   }[]>([]);
   
   const recognitionRef = useRef<any>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // 在挂载时从 localStorage 加载历史记录
   useEffect(() => {
@@ -147,10 +148,17 @@ export default function App() {
     setTimeout(() => setConfetti([]), 4500);
   };
 
-  // 执行规划逻辑 (异步 await 小米 API 或本地 Mock 分流)
   const handlePlan = async (targetQuery: string, forceAiOption?: boolean) => {
     if (!targetQuery.trim()) return;
     
+    // 如果之前有尚未完成的规划请求，立即强行中断，防止网络竞态和前台冲突
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setIsLoading(true);
     setExecuteSuccess(false);
     setIsExecuting(false);
@@ -202,7 +210,7 @@ export default function App() {
             message: `🧠 MIMO AI 正在进行多目标画像对齐与空间网络画线计算，冥想流式输出中...\n\n${cleanText}` 
           }
         ]);
-      });
+      }, controller.signal); // 传入 controller.signal 信号！
       setConstraints(parsed);
 
       const newPlan = generateSmartPlan(parsed);
@@ -276,8 +284,23 @@ export default function App() {
         localStorage.setItem('meituan_ai_history', JSON.stringify(updated));
         return updated;
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      
+      // 判断是否是由于用户在前台手动点击“停止思考”而强行截断的
+      if (err.name === 'AbortError' || controller.signal.aborted) {
+        setLogs([
+          {
+            timestamp: new Date().toLocaleTimeString(),
+            type: 'replan',
+            message: `⚠️ 已按您的指令为您“停止思考”。随时可以重新输入心愿，小美等候您的召唤！`
+          }
+        ]);
+        setPlan(null);
+        setConstraints(null);
+        return; // 直接返回，绝不走静默本地降级
+      }
+
       setLogs(prev => [
         ...prev,
         {
@@ -287,6 +310,9 @@ export default function App() {
         }
       ]);
     } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
       setIsLoading(false);
     }
   };
@@ -737,8 +763,15 @@ export default function App() {
               </button>
 
               <button
-                disabled={isLoading}
-                onClick={() => handlePlan(query)}
+                onClick={() => {
+                  if (isLoading) {
+                    if (abortControllerRef.current) {
+                      abortControllerRef.current.abort();
+                    }
+                  } else {
+                    handlePlan(query);
+                  }
+                }}
                 className={`w-9 h-9 rounded-2xl flex items-center justify-center shadow-md active:scale-95 transition-all shrink-0 cursor-pointer ${
                   useAi 
                     ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-slate-900 font-extrabold shadow-amber-500/10 hover:from-amber-300 hover:to-amber-400' 
