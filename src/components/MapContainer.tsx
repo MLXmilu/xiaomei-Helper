@@ -314,7 +314,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
   const retailVirtualCoords = { x: 45, y: 75 };
 
   return (
-    <div className="glass-panel rounded-3xl p-3 flex flex-col h-[230px] relative overflow-hidden select-none">
+    <div className="glass-panel rounded-3xl p-3 flex flex-col h-[280px] lg:h-[420px] relative overflow-hidden select-none">
       
       {/* 1. 真实高德 3D 地图容器 */}
       <div 

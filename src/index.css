@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 @import "tailwindcss";
 
@@ -14,14 +14,14 @@
   --color-darkbg-border: #EFECE6;/* 温馨奶茶系极细边框 */
   --color-darkbg-muted: #8E8A83; /* 优雅的轻灰褐色低调字 */
 
-  --font-sans: 'Outfit', 'Inter', 'system-ui', '-apple-system', 'sans-serif';
+  --font-sans: 'Noto Sans SC', 'Outfit', 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   
   --blur-xs: 2px;
 }
 
 @layer base {
   body {
-    @apply bg-darkbg text-slate-800 font-sans antialiased overflow-x-hidden select-none;
+    @apply bg-darkbg text-slate-800 font-sans antialiased overflow-x-hidden;
     /* 舒缓柔和的晨曦暖阳渐变，极佳温馨感 */
     background-image: 
       radial-gradient(at 0% 0%, rgba(255, 209, 0, 0.05) 0px, transparent 50%),
@@ -119,5 +119,20 @@
 }
 .voice-bar {
   animation: soundwave 1s ease-in-out infinite;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
