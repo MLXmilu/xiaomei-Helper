@@ -2,7 +2,8 @@ import { usePlanning } from '../../context/PlanningContext';
 
 export function HistoryRail({ vertical = false }: { vertical?: boolean }) {
   const { historyList, plan, constraints, handleRestoreHistory, handleClearHistory } = usePlanning();
-  if (historyList.length === 0) return null;
+  const aiHistory = historyList.filter(item => item.isAi === true);
+  if (aiHistory.length === 0) return null;
 
   return (
     <div className={`${vertical ? 'space-y-3' : 'space-y-2'}`}>
@@ -14,7 +15,7 @@ export function HistoryRail({ vertical = false }: { vertical?: boolean }) {
         <button onClick={handleClearHistory} className="text-xs text-slate-400 hover:text-slate-600 font-semibold">清空</button>
       </div>
       <div className={vertical ? 'space-y-2' : 'flex gap-2 overflow-x-auto pb-1'}>
-        {historyList.map(item => {
+        {aiHistory.map(item => {
           const selected = plan && constraints && constraints.originalQuery === item.constraints.originalQuery;
           return (
             <button
@@ -25,7 +26,7 @@ export function HistoryRail({ vertical = false }: { vertical?: boolean }) {
               }`}
             >
               <span className="line-clamp-1">{item.query}</span>
-              <span className="text-xs text-amber-600 mt-1 block">¥{item.plan.totalCost} · {item.timestamp}</span>
+              <span className="text-xs text-slate-400 mt-1 block">{item.timestamp}</span>
             </button>
           );
         })}

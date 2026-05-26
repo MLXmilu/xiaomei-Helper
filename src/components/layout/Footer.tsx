@@ -1,9 +1,16 @@
-import { Heart, Smartphone } from 'lucide-react';
+import { Heart, MonitorSmartphone } from 'lucide-react';
+
+const MOBILE_TIPS = [
+  '建议宽度 ≥ 375px，竖屏浏览体验最佳',
+  '支持 Chrome / Edge 移动端与桌面端',
+  '行程规划页支持语音输入（需浏览器授权麦克风）',
+  '地图与下单流程已做触控友好布局',
+];
 
 export function Footer() {
   return (
     <footer className="border-t border-[#efece6] bg-white mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="page-container py-12">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
           <div className="md:col-span-5 space-y-4">
             <div className="flex items-center gap-2.5">
@@ -15,21 +22,19 @@ export function Footer() {
             <p className="text-sm text-slate-500 leading-relaxed max-w-sm">
               本地短时出行规划与一键执行。从说出安排到路线规划、下单，让每次周末陪伴更省心。
             </p>
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors"
-              >
-                <Smartphone className="w-4 h-4 opacity-80" />
-                App Store
-              </button>
-              <button
-                type="button"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition-colors"
-              >
-                <Smartphone className="w-4 h-4 opacity-80" />
-                Android
-              </button>
+            <div className="rounded-2xl border border-[#efece6] bg-[#fdfbf9] px-4 py-3.5 space-y-2">
+              <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <MonitorSmartphone className="w-4 h-4 text-amber-600" />
+                移动端适配说明
+              </p>
+              <ul className="space-y-1.5 text-xs text-slate-500 leading-relaxed">
+                {MOBILE_TIPS.map(tip => (
+                  <li key={tip} className="flex gap-2">
+                    <span className="text-amber-500 shrink-0">·</span>
+                    <span>{tip}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
 

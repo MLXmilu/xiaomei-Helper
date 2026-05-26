@@ -1,6 +1,11 @@
 import { Send, Mic, MicOff, Loader2, Globe } from 'lucide-react';
 import { usePlanning } from '../../context/PlanningContext';
 import { PRESETS } from '../../constants/presets';
+import {
+  INPUT_PLACEHOLDER_AI,
+  INPUT_PLACEHOLDER_STANDARD,
+} from '../../constants/travelProfiles';
+import { ProfileInputGuide } from './ProfileInputGuide';
 
 interface SearchPanelProps {
   compact?: boolean;
@@ -12,12 +17,20 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
     isPlanFromAi, handlePlan, toggleListening,
   } = usePlanning();
 
+  const pickExample = (text: string) => {
+    setQuery(text);
+  };
+
   return (
     <div className={`space-y-4 ${compact ? '' : 'glass-panel p-5'}`}>
       {!compact && (
         <div>
           <h2 className="text-lg font-extrabold text-slate-800">说说你的周末安排</h2>
-          <p className="text-sm text-slate-500 mt-1">像跟朋友聊天一样描述即可，小美会帮你排路线</p>
+          <p className="text-sm text-slate-500 mt-1">
+            {useAi
+              ? '联网模式下请尽量写清：谁一起、什么氛围、去哪、多久'
+              : '像跟朋友聊天一样描述即可；也可点下方场景快速填入'}
+          </p>
         </div>
       )}
 
@@ -45,14 +58,16 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
         </div>
       </div>
 
+      {useAi && !compact && <ProfileInputGuide onPickExample={pickExample} />}
+
       <div className={`relative bg-white rounded-2xl border-2 flex items-end shadow-sm transition-all ${
         useAi ? 'border-amber-200 focus-within:border-amber-300' : 'border-slate-200 focus-within:border-meituan/60'
       }`}>
         <textarea
-          rows={compact ? 2 : 3}
+          rows={compact ? 2 : useAi ? 4 : 3}
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="例如：带5岁娃和减肥老婆，周六下午3公里内，先玩再吃点清淡的..."
+          placeholder={useAi ? INPUT_PLACEHOLDER_AI : INPUT_PLACEHOLDER_STANDARD}
           className="flex-1 bg-transparent px-4 py-3 text-sm text-slate-800 placeholder-slate-400 border-0 focus:outline-none resize-none leading-relaxed"
         />
         <div className="flex items-center gap-1 p-2 shrink-0">
@@ -64,6 +79,7 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
             </div>
           )}
           <button
+            type="button"
             onClick={toggleListening}
             className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
               isListening ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
@@ -72,6 +88,7 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
             {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
           </button>
           <button
+            type="button"
             onClick={() => handlePlan(query)}
             className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm transition-all bg-meituan text-slate-800 hover:bg-meituan-light"
           >
@@ -80,21 +97,29 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {PRESETS.map((preset, i) => (
-          <button
-            key={i}
-            onClick={() => { setQuery(preset.text); handlePlan(preset.text); }}
-            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
-              query === preset.text
-                ? 'bg-amber-50 border-amber-300 text-amber-800'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-amber-200 hover:bg-amber-50/50'
-            }`}
-          >
-            {preset.emoji} {preset.label}
-          </button>
-        ))}
-      </div>
+      {!useAi && (
+        <>
+          <p className="text-[11px] text-slate-400 px-1">
+            标准模式可点场景；若需识别「热血青春」等画像，建议切换联网推荐并参照上方填写要点
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map((preset, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => { setQuery(preset.text); handlePlan(preset.text); }}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
+                  query === preset.text
+                    ? 'bg-amber-50 border-amber-300 text-amber-800'
+                    : 'bg-white border-slate-200 text-slate-600 hover:border-amber-200 hover:bg-amber-50/50'
+                }`}
+              >
+                {preset.emoji} {preset.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

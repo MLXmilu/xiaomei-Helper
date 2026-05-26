@@ -5,6 +5,8 @@ import type { TimelineItem } from '../agentEngine';
 interface MapContainerProps {
   timeline: TimelineItem[];
   isExecuting: boolean;
+  /** 铺满父容器高度（用于行程规划页主地图区） */
+  fill?: boolean;
 }
 
 declare global {
@@ -13,8 +15,9 @@ declare global {
   }
 }
 
-export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecuting }) => {
+export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecuting, fill = false }) => {
   const mapRef = useRef<any>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<any[]>([]);
   const routesRef = useRef<any[]>([]);
   const [hasRealMap, setHasRealMap] = useState<boolean>(false);
@@ -265,6 +268,19 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
     }
   }, [timeline, isExecuting]);
 
+  useEffect(() => {
+    if (!fill || !hasRealMap || !mapRef.current || !rootRef.current) return;
+    const ro = new ResizeObserver(() => {
+      try {
+        mapRef.current?.resize?.();
+      } catch {
+        /* ignore */
+      }
+    });
+    ro.observe(rootRef.current);
+    return () => ro.disconnect();
+  }, [fill, hasRealMap, timeline]);
+
   // D. 降级 SVG 沙盘布局算法：将多节点呈优雅 S 曲线或网格起伏优雅分层，实现多节点完美适应
   const getVirtualCoords = (index: number, total: number) => {
     const item = activeItems[index];
@@ -314,18 +330,24 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
   const retailVirtualCoords = { x: 45, y: 75 };
 
   return (
-    <div className="glass-panel rounded-3xl p-3 flex flex-col h-[280px] lg:h-[420px] relative overflow-hidden select-none">
-      
+    <div
+      ref={rootRef}
+      className={
+        fill
+          ? 'absolute inset-0 w-full h-full overflow-hidden select-none bg-slate-100'
+          : 'glass-panel rounded-3xl p-3 flex flex-col h-[280px] lg:h-[420px] relative overflow-hidden select-none'
+      }
+    >
       {/* 1. 真实高德 3D 地图容器 */}
-      <div 
-        id="amap-container" 
+      <div
+        id="amap-container"
         className={`absolute inset-0 w-full h-full transition-opacity duration-700 ${
           hasRealMap ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
         }`}
-      ></div>
+      />
 
       {/* 2. 优雅降级 100% 动态沙盘 (当真实高德不可用时双重保障) */}
-      <div className="flex-1 w-full relative grid-bg flex flex-col z-0">
+      <div className={`w-full relative grid-bg flex flex-col z-0 ${fill ? 'absolute inset-0' : 'flex-1'}`}>
         
         <div className="w-full flex items-center justify-between border-b border-darkbg-border/60 pb-1 px-1">
           <span className="text-[10px] font-bold text-slate-500 flex items-center space-x-1">
@@ -346,8 +368,8 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
           </div>
         </div>
 
-        <div className="flex-1 w-full flex items-center justify-center relative mt-1">
-          <svg viewBox="0 0 100 100" className="w-full h-full max-h-[145px]">
+        <div className={`flex-1 w-full flex items-center justify-center relative mt-1 ${fill ? 'min-h-0' : ''}`}>
+          <svg viewBox="0 0 100 100" className={`w-full h-full ${fill ? 'max-h-none' : 'max-h-[145px]'}`}>
             <defs>
               <linearGradient id="warmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#FFD100" />

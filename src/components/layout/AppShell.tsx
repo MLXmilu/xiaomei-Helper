@@ -5,7 +5,7 @@ import { ConfettiLayer } from '../planner/ConfettiLayer';
 
 export function AppShell() {
   return (
-    <div className="min-h-screen flex flex-col bg-darkbg">
+    <div className="min-h-screen w-full flex flex-col bg-darkbg">
       <ConfettiLayer />
       <Navbar />
       <main className="flex-1">

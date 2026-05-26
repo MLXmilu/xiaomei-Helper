@@ -28,7 +28,7 @@ export function PlannerPage() {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+      <div className="page-container py-6 lg:py-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-extrabold text-slate-900">{c.pageTitle}</h1>
@@ -53,8 +53,8 @@ export function PlannerPage() {
             </div>
           </aside>
 
-          <div className="space-y-4 min-w-0">
-            {isLoading && <AssistantBubble />}
+          <div className="space-y-5 min-w-0">
+            {isLoading && !plan && <AssistantBubble />}
 
             {useAi && !plan && !isLoading && (
               <div className="glass-panel p-8 text-center space-y-3 border border-slate-200 bg-slate-50/50">
@@ -72,26 +72,31 @@ export function PlannerPage() {
             )}
 
             {plan && (
-              <div className="grid xl:grid-cols-2 gap-5">
-                <div className="glass-panel overflow-hidden p-1 min-h-[320px]">
-                  <MapContainer timeline={plan.timeline} isExecuting={isExecuting} />
-                </div>
-                <div className="space-y-4">
-                  <AssistantBubble />
-                  <ProfileBadges />
-                  <div className="glass-panel p-5">
-                    <h4 className="text-sm font-extrabold text-slate-400 uppercase tracking-wider mb-4">
-                      {c.timelineTitle}
-                    </h4>
-                    <TimelineCards
-                      timeline={plan.timeline}
-                      onSwapOrder={handleSwapOrder}
-                      onShuffleNode={handleShuffleNode}
-                      isExecuting={isExecuting}
-                    />
+              <>
+                <div className="relative w-full h-[min(58vh,620px)] min-h-[380px] rounded-3xl overflow-hidden border border-slate-200/90 bg-slate-100 shadow-md">
+                  <MapContainer timeline={plan.timeline} isExecuting={isExecuting} fill />
+                  <div className="absolute top-3 right-3 left-3 sm:left-auto z-20 flex flex-col gap-3 sm:max-w-sm pointer-events-none">
+                    <div className="pointer-events-auto shadow-lg rounded-3xl">
+                      <AssistantBubble />
+                    </div>
+                    <div className="pointer-events-auto shadow-lg rounded-3xl">
+                      <ProfileBadges />
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                <div className="glass-panel p-5">
+                  <h4 className="text-sm font-extrabold text-slate-400 uppercase tracking-wider mb-4">
+                    {c.timelineTitle}
+                  </h4>
+                  <TimelineCards
+                    timeline={plan.timeline}
+                    onSwapOrder={handleSwapOrder}
+                    onShuffleNode={handleShuffleNode}
+                    isExecuting={isExecuting}
+                  />
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -99,7 +104,7 @@ export function PlannerPage() {
 
       {plan && (
         <div className="border-t border-slate-200 bg-white/90 backdrop-blur-md sticky bottom-0 z-20">
-          <div className="max-w-7xl mx-auto">
+          <div className="page-container">
             <CheckoutBar />
           </div>
         </div>

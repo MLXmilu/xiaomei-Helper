@@ -20,6 +20,11 @@ export interface AppConstraints {
   hasChild: boolean;     // 是否带娃
   hasSlimming: boolean;  // 是否减肥
   isFriendsGroup: boolean; // 是否是朋友社交
+  isYouthVibe: boolean;  // 年轻人热血青春、潮流打卡
+  isThrillFun: boolean;  // 刺激嗨玩、夜生活
+  isCoupleDate: boolean; // 情侣约会
+  isChillRelax: boolean; // 松弛疗愈
+  isBudgetSaver: boolean; // 高性价比 / 省钱
   transportPreference: 'subway' | 'taxi' | 'walk' | 'auto'; // 出行工具偏好
   nodes: AIRecommendationNode[]; // 核心节点序列，按建议游玩顺序排列（支持任意多个目的地！）
 }
@@ -102,6 +107,7 @@ export function estimateTravelTime(distanceKm: number): { duration: number; mode
 // 1. 小米大模型 API 意图解析器 (流式高并发版)
 // ==========================================
 import { AI_CONFIG } from './config';
+import { mergeTravelProfiles, formatProfileSummary } from './constants/travelProfiles';
 
 // 鲁棒的JSON提取器，能从任何混杂杂质的字符串中精准提取首尾匹配的JSON格式
 export function extractPureJSON(text: string): string {
@@ -129,10 +135,8 @@ export async function parseNaturalLanguageQuery(
   
   // A. 正则表达式分词本地解析兜底器 (防翻车，保证 100% 成功运行，并且能精准对齐北京多景点行程！)
   const localFallback = (): AppConstraints => {
-    const hasChild = /(孩子|娃|宝|儿童|5岁|五岁|三岁|学龄前)/.test(lowercase);
-    const hasSlimming = /(减肥|减脂|瘦|轻食|沙拉|卡路里|控糖|热量|减重)/.test(lowercase);
-    const isFriendsGroup = /(朋友|男生|女生|聚会|闺蜜|兄弟|桌游|密室|社交)/.test(lowercase);
-    
+    const profiles = mergeTravelProfiles(undefined, query);
+
     // 智能提取交通方式偏好
     let transportPreference: AppConstraints['transportPreference'] = 'auto';
     if (/(地铁|地跌|坐地铁|乘地铁)/.test(lowercase)) {
@@ -258,11 +262,9 @@ export async function parseNaturalLanguageQuery(
       originalQuery: query,
       durationHours,
       maxDistanceKm: finalMaxDistance,
-      hasChild,
-      hasSlimming,
-      isFriendsGroup,
+      ...profiles,
       transportPreference,
-      nodes
+      nodes,
     };
   };
 
@@ -316,7 +318,12 @@ export async function parseNaturalLanguageQuery(
   "maxDistanceKm": 数字，离家/起点的最大公里数（北京跨区景点如天坛、故宫、颐和园跨度较大，若包含这类跨区景点请设为 30），若未提及则默认 5,
   "hasChild": 布尔值，是否带小孩/儿童/宝宝/学龄前/几岁娃,
   "hasSlimming": 布尔值，是否有减肥/瘦身/减脂/低盐低糖/轻食/沙拉等健康塑形需求,
-  "isFriendsGroup": 布尔值，是否是青年社交/密室/聚会/桌游/剧本杀等多人社交场合,
+  "isFriendsGroup": 布尔值，是否是朋友聚会/闺蜜兄弟/桌游社交,
+  "isYouthVibe": 布尔值，是否体现年轻人热血激情、青春潮流、网红打卡、元气满满,
+  "isThrillFun": 布尔值，是否追求刺激嗨玩，如密室、剧本杀、Live、音乐节、酒吧、电竞、极限运动,
+  "isCoupleDate": 布尔值，是否是情侣约会、纪念日、浪漫二人世界,
+  "isChillRelax": 布尔值，是否偏松弛疗愈、慢生活、露营看海、温泉发呆,
+  "isBudgetSaver": 布尔值，是否强调省钱、性价比、预算有限,
   "transportPreference": 字符串，"subway" | "taxi" | "walk" | "auto" 中的一个，如果用户强指定了出行方式如“坐地铁”则为 subway，提到“打车”则为 taxi，提到“步行/散步”则为 walk，未强指定则为 auto,
   "nodes": [
     {
@@ -400,9 +407,7 @@ export async function parseNaturalLanguageQuery(
     const parsedData = JSON.parse(jsonString);
     clearTimeout(timeoutId);
 
-    const hasChild = parsedData.hasChild ?? /(孩子|娃|宝|儿童|5岁|五岁|三岁|学龄前)/.test(lowercase);
-    const hasSlimming = parsedData.hasSlimming ?? /(减肥|减脂|瘦|轻食|沙拉|卡路里|控糖|热量|减重)/.test(lowercase);
-    const isFriendsGroup = parsedData.isFriendsGroup ?? /(朋友|男生|女生|聚会|闺蜜|兄弟|桌游|密室|社交)/.test(lowercase);
+    const profiles = mergeTravelProfiles(parsedData, query);
     const transportPreference = parsedData.transportPreference ?? (/(地铁|地跌|坐地铁|乘地铁)/.test(lowercase) ? 'subway' : /(打车|出租|专车|快车|自驾|开车)/.test(lowercase) ? 'taxi' : /(步行|走路|散步)/.test(lowercase) ? 'walk' : 'auto');
 
     if (Array.isArray(parsedData.nodes) && parsedData.nodes.length > 0) {
@@ -410,9 +415,7 @@ export async function parseNaturalLanguageQuery(
         originalQuery: query,
         durationHours: parsedData.durationHours ?? 5,
         maxDistanceKm: parsedData.maxDistanceKm ?? 5,
-        hasChild,
-        hasSlimming,
-        isFriendsGroup,
+        ...profiles,
         transportPreference,
         nodes: parsedData.nodes.map((n: any) => ({
           name: n.name || "推荐景点",
@@ -722,7 +725,11 @@ export function generateSmartPlan(
   const dietScore = constraints.hasSlimming ? 95 : 85;
   const childFriendlyScore = constraints.hasChild ? 98 : 75;
   const friendsVibeScore = constraints.isFriendsGroup ? 96 : 80;
-  const compatibilityScore = Math.round((dietScore + childFriendlyScore + friendsVibeScore) / 3);
+  const youthVibeScore =
+    constraints.isYouthVibe || constraints.isThrillFun ? 97 : 78;
+  const compatibilityScore = Math.round(
+    (dietScore + childFriendlyScore + friendsVibeScore + youthVibeScore) / 4,
+  );
 
   const totalTimeMinutes = currentMinutes - startMinutes;
   
@@ -791,7 +798,7 @@ export async function executePlanTools(
   // --- Step 1: 解析隐式约束 ---
   addLog('thought', `正在分析用户目标: "${constraints.originalQuery}"`);
   await delay(1000);
-  addLog('thought', `发现隐式约束 ── 成员画像: [${constraints.hasChild ? '5岁宝宝 ' : ''}${constraints.hasSlimming ? '减肥老婆 ' : ''}${constraints.isFriendsGroup ? '朋友聚会' : ''}]。`);
+  addLog('thought', `发现隐式约束 ── 出行画像: [${formatProfileSummary(constraints)}]。`);
   addLog('thought', `距离限制: < ${constraints.maxDistanceKm}km。正在调用 searchNearbyLocations()...`);
   await delay(800);
 

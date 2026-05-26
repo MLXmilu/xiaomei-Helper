@@ -8,6 +8,7 @@ import {
   type ThoughtLog,
 } from '../agentEngine';
 import { MOCK_LOCATIONS } from '../mockData';
+import { formatProfileSummary } from '../constants/travelProfiles';
 
 export interface HistoryItem {
   id: number;
@@ -15,6 +16,10 @@ export interface HistoryItem {
   plan: ActivityPlan;
   constraints: AppConstraints;
   timestamp: string;
+  /** 是否为 AI 联网对话产生的记录（决策历史仅展示此类） */
+  isAi: boolean;
+  /** AI 对话摘要，用于历史列表展示 */
+  aiLogs?: ThoughtLog[];
 }
 
 interface ConfettiParticle {
@@ -90,7 +95,14 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const stored = localStorage.getItem('meituan_ai_history');
-      if (stored) setHistoryList(JSON.parse(stored));
+      if (stored) {
+        const parsed: HistoryItem[] = JSON.parse(stored);
+        const aiOnly = parsed.filter(item => item.isAi === true);
+        setHistoryList(aiOnly);
+        if (aiOnly.length !== parsed.length) {
+          localStorage.setItem('meituan_ai_history', JSON.stringify(aiOnly));
+        }
+      }
     } catch (e) {
       console.error('Failed to load history:', e);
     }
@@ -163,7 +175,7 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
       const logsToAdd: ThoughtLog[] = activeAi
         ? [
             { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 已听懂你的安排："${targetQuery}"` },
-            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `已按${parsed.hasChild ? '带娃、' : ''}${parsed.hasSlimming ? '低卡、' : ''}${parsed.isFriendsGroup ? '聚会、' : ''}离家 ${parsed.maxDistanceKm} 公里内挑好店。` },
+            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `已按「${formatProfileSummary(parsed)}」画像、离家 ${parsed.maxDistanceKm} 公里内挑好店。` },
           ]
         : [
             { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 已听懂你的安排："${targetQuery}"` },
@@ -172,12 +184,28 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
       logsToAdd.push({ timestamp: new Date().toLocaleTimeString(), type: 'success', message: `路线排好啦，地图已连线，需要的话可以直接全包下单。` });
       setLogs(logsToAdd);
 
-      const newHistoryItem: HistoryItem = { id: Date.now(), query: targetQuery, plan: newPlan, constraints: parsed, timestamp: new Date().toLocaleTimeString() };
-      setHistoryList(prev => {
-        const updated = [newHistoryItem, ...prev.filter(i => i.query !== targetQuery)].slice(0, 6);
-        localStorage.setItem('meituan_ai_history', JSON.stringify(updated));
-        return updated;
-      });
+      if (activeAi) {
+        const newHistoryItem: HistoryItem = {
+          id: Date.now(),
+          query: targetQuery,
+          plan: newPlan,
+          constraints: parsed,
+          timestamp: new Date().toLocaleString('zh-CN', {
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          }),
+          isAi: true,
+          aiLogs: logsToAdd,
+        };
+        setHistoryList(prev => {
+          const updated = [newHistoryItem, ...prev.filter(i => i.query !== targetQuery)].slice(0, 20);
+          localStorage.setItem('meituan_ai_history', JSON.stringify(updated));
+          return updated;
+        });
+      }
     } catch (err: any) {
       if (err.name === 'AbortError' || controller.signal.aborted) {
         setLogs([{ timestamp: new Date().toLocaleTimeString(), type: 'replan', message: `已暂停。改一改安排随时可以再试。` }]);

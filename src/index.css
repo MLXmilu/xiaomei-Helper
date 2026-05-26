@@ -19,7 +19,18 @@
   --blur-xs: 2px;
 }
 
+/* 全宽页面内边距（替代 max-w-7xl 居中窄栏） */
+.page-container {
+  @apply w-full px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-20;
+}
+
 @layer base {
+  html,
+  body,
+  #root {
+    @apply w-full min-h-screen;
+  }
+
   body {
     @apply bg-darkbg text-slate-800 font-sans antialiased overflow-x-hidden;
     /* 舒缓柔和的晨曦暖阳渐变，极佳温馨感 */

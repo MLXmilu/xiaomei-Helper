@@ -16,7 +16,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-[#efece6]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="page-container">
         <div className="flex items-center justify-between h-[4.25rem] gap-4">
           <NavLink to="/" className="flex items-center gap-3 shrink-0 group">
             <div className="w-10 h-10 rounded-xl bg-[#FFD100] flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
