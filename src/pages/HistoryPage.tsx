@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, ArrowRight, Trash2, MessageCircle } from 'lucide-react';
+import { Clock, ArrowRight, Trash2, MessageCircle, CheckSquare, Square } from 'lucide-react';
 import { usePlanning } from '../context/PlanningContext';
 import { HISTORY_COPY } from '../constants/uiCopy';
 
@@ -17,12 +17,38 @@ function formatAiPreview(logs: { message: string }[] | undefined) {
 
 export function HistoryPage() {
   const navigate = useNavigate();
-  const { historyList, handleRestoreHistory, handleClearHistory } = usePlanning();
+  const { historyList, handleRestoreHistory, handleClearHistory, handleDeleteHistory } = usePlanning();
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const aiHistory = useMemo(
     () => historyList.filter(item => item.isAi === true),
     [historyList],
   );
+
+  const allSelected = aiHistory.length > 0 && selectedIds.size === aiHistory.length;
+  const hasSelection = selectedIds.size > 0;
+
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.size === aiHistory.length) return new Set();
+      return new Set(aiHistory.map(item => item.id));
+    });
+  }, [aiHistory]);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    handleDeleteHistory(Array.from(selectedIds));
+    setSelectedIds(new Set());
+  }, [selectedIds, handleDeleteHistory]);
 
   return (
     <div className="page-container py-8 lg:py-12">
@@ -35,14 +61,35 @@ export function HistoryPage() {
           <p className="text-sm text-slate-500 mt-1">{c.pageSubtitle}</p>
         </div>
         {aiHistory.length > 0 && (
-          <button
-            type="button"
-            onClick={handleClearHistory}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-all"
-          >
-            <Trash2 className="w-4 h-4" />
-            {c.clearAll}
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold hover:bg-slate-50 transition-all"
+            >
+              {allSelected ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+              {c.selectAll}
+            </button>
+            {hasSelection && (
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+                {c.deleteSelected}
+                <span className="text-xs text-red-400">({selectedIds.size})</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleClearHistory}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50 transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+              {c.clearAll}
+            </button>
+          </div>
         )}
       </div>
 
@@ -63,12 +110,26 @@ export function HistoryPage() {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch">
           {aiHistory.map(item => {
             const aiPreview = formatAiPreview(item.aiLogs);
+            const isSelected = selectedIds.has(item.id);
             return (
               <article
                 key={item.id}
-                className="glass-panel p-6 flex flex-col h-full min-h-[220px] hover:shadow-xl transition-shadow group"
+                className={`glass-panel p-6 flex flex-col h-full min-h-[220px] hover:shadow-xl transition-all group relative ${isSelected ? 'ring-2 ring-amber-400 border-amber-300' : ''}`}
               >
-                <div className="flex items-center gap-2 shrink-0 mb-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSelect(item.id)}
+                  className="absolute top-4 left-4 z-10 p-0.5 rounded-md hover:bg-slate-100 transition-colors"
+                  aria-label={isSelected ? '取消选择' : '选择此记录'}
+                >
+                  {isSelected ? (
+                    <CheckSquare className="w-5 h-5 text-amber-500" />
+                  ) : (
+                    <Square className="w-5 h-5 text-slate-300 group-hover:text-slate-400" />
+                  )}
+                </button>
+
+                <div className="flex items-center gap-2 shrink-0 mb-3 pl-7">
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-100 text-[11px] font-bold text-amber-800">
                     <MessageCircle className="w-3 h-3" />
                     AI 对话

@@ -9,6 +9,7 @@ import { ProfileBadges } from '../components/planner/ProfileBadges';
 import { CheckoutBar } from '../components/planner/CheckoutBar';
 import { ShareModal } from '../components/planner/ShareModal';
 import { CashierModal } from '../components/planner/CashierModal';
+import { CollabModal } from '../components/planner/CollabModal';
 import { MapContainer } from '../components/MapContainer';
 import { TimelineCards } from '../components/TimelineCards';
 
@@ -19,7 +20,9 @@ export function PlannerPage() {
   const {
     plan, useAi, isLoading, simulateError, setSimulateError,
     handlePlan, handleSwapOrder, handleShuffleNode, isExecuting,
+    openCollabModal
   } = usePlanning();
+
 
   useEffect(() => {
     const query = (location.state as { query?: string })?.query;
@@ -73,13 +76,15 @@ export function PlannerPage() {
 
             {plan && (
               <>
-                <div className="relative w-full h-[min(58vh,620px)] min-h-[380px] rounded-3xl overflow-hidden border border-slate-200/90 bg-slate-100 shadow-md">
-                  <MapContainer timeline={plan.timeline} isExecuting={isExecuting} fill />
-                  <div className="absolute top-3 right-3 left-3 sm:left-auto z-20 flex flex-col gap-3 sm:max-w-sm pointer-events-none">
-                    <div className="pointer-events-auto shadow-lg rounded-3xl">
+                <div className="flex gap-4">
+                  <div className="relative flex-1 h-[min(58vh,620px)] min-h-[380px] rounded-3xl overflow-hidden border border-slate-200/90 bg-slate-100 shadow-md">
+                    <MapContainer timeline={plan.timeline} isExecuting={isExecuting} fill targetCity={plan.targetCity} />
+                  </div>
+                  <div className="hidden sm:flex flex-col gap-3 w-64 shrink-0 pt-1">
+                    <div className="shadow-lg rounded-3xl">
                       <AssistantBubble />
                     </div>
-                    <div className="pointer-events-auto shadow-lg rounded-3xl">
+                    <div className="shadow-lg rounded-3xl">
                       <ProfileBadges />
                     </div>
                   </div>
@@ -89,11 +94,39 @@ export function PlannerPage() {
                   <h4 className="text-sm font-extrabold text-slate-400 uppercase tracking-wider mb-4">
                     {c.timelineTitle}
                   </h4>
+
+                  {/* 👨‍👩‍👧 极美的大厂级家人协同评审 Banner 提醒卡 */}
+                  <div className="mb-6 bg-gradient-to-r from-amber-500/5 via-orange-500/5 to-amber-500/5 border border-amber-500/10 rounded-2xl p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none relative overflow-hidden animate-[pulse_3s_infinite]">
+                    <div className="flex gap-3.5 items-start sm:items-center">
+                      <div className="w-11 h-11 rounded-2xl bg-amber-100 flex items-center justify-center text-xl shrink-0 border border-amber-200/50 shadow-xs">
+                        👨‍👩‍👧
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-black text-slate-800 tracking-tight flex items-center gap-2">
+                          <span>多人意图协同评审端</span>
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                          </span>
+                        </h5>
+                        <p className="text-[10px] text-slate-400 font-bold mt-1 leading-normal max-w-lg">觉得当前推荐不符合家人口味？把手机递给老婆或发给朋友，让他们自己动手微调偏好！</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openCollabModal()}
+                      className="px-5 py-2.5 rounded-xl bg-meituan hover:bg-meituan-light active:scale-95 text-slate-800 text-[11px] font-black border border-amber-400 shrink-0 transition-all shadow-sm cursor-pointer flex items-center gap-1.5 active:translate-y-px"
+                    >
+                      🤝 递给家人/朋友微调
+                    </button>
+                  </div>
+
                   <TimelineCards
                     timeline={plan.timeline}
                     onSwapOrder={handleSwapOrder}
                     onShuffleNode={handleShuffleNode}
                     isExecuting={isExecuting}
+                    targetCity={plan.targetCity}
                   />
                 </div>
               </>
@@ -112,6 +145,7 @@ export function PlannerPage() {
 
       <ShareModal />
       <CashierModal />
+      <CollabModal />
     </>
   );
 }

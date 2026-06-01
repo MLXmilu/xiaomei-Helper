@@ -1,8 +1,17 @@
+import { useEffect, useRef } from 'react';
 import { usePlanning } from '../../context/PlanningContext';
 
 export function AssistantBubble() {
   const { logs, isLoading, plan } = usePlanning();
-  if (!isLoading && !plan) return null;
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [logs, isLoading]);
+  const hasError = logs.some(log => log.type === 'error');
+  if (!isLoading && !plan && !hasError) return null;
   if (logs.length === 0) return null;
 
   return (
@@ -15,7 +24,10 @@ export function AssistantBubble() {
           <span className="text-sm font-extrabold text-slate-800">管家小美</span>
           <span className="text-xs text-slate-400">{isLoading ? '正在安排…' : '管家留言'}</span>
         </div>
-        <div className="space-y-2">
+        <div 
+          ref={scrollContainerRef}
+          className="space-y-2 max-h-[280px] overflow-y-auto pr-1.5 scroll-smooth [scrollbar-width:thin] [scrollbar-color:rgba(0,0,0,0.15)_transparent]"
+        >
           {logs.slice(-2).map((log, i) => (
             <p
               key={i}

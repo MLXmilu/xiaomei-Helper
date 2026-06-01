@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Home, Compass, UtensilsCrossed, ArrowDownUp, 
   RefreshCw, Clock, DollarSign, Users, AlertTriangle,
-  Train, Car, Footprints
+  Train, Car, Footprints, Bus
 } from 'lucide-react';
 import type { TimelineItem } from '../agentEngine';
 
@@ -12,7 +12,7 @@ interface SubwayRoutePanelProps {
   startName: string;
   endName: string;
   defaultTime: number;
-  defaultDist: number;
+  targetCity?: string;
 }
 
 export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
@@ -21,7 +21,7 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
   startName,
   endName,
   defaultTime,
-  defaultDist
+  targetCity
 }) => {
   const [loading, setLoading] = useState(true);
   const [routeData, setRouteData] = useState<any>(null);
@@ -40,7 +40,7 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
 
     window.AMap.plugin(['AMap.Transfer'], () => {
       const transfer = new window.AMap.Transfer({
-        city: '北京市',
+        city: targetCity || '北京市',
         policy: window.AMap.TransferPolicy.LEAST_TIME
       });
 
@@ -93,15 +93,65 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
     );
   }
 
-  // 优雅的兜底方案 (若网络解析异常或大北京跨度超限)
+  // 优雅的自适应兜底方案 (若网络解析异常、大北京跨度超限或景点间高德无直达公共交通)
   const finalTime = routeData ? routeData.totalTime : defaultTime;
-  const finalDist = routeData ? routeData.totalDist : defaultDist;
   const finalCost = routeData ? routeData.cost : 4;
-  const segments = routeData?.segments || [
-    { mode: 'WALK', distance: 150, time: 2 },
-    { mode: 'SUBWAY', lineName: '地铁8号线', stopCount: 4, direction: '朱辛庄方向', onStation: '天桥站', offStation: '金鱼胡同站', time: 8, viaStops: ['珠市口站', '前门站', '王府井站'] },
-    { mode: 'WALK', distance: 220, time: 3 }
-  ];
+
+  const getFallbackSegments = () => {
+    const city = targetCity || '北京市';
+    const cleanCity = city.replace(/市|县/g, ''); // 杭州、北京等
+    
+    // 清理名称中的括号，比如 "杭州东站(出发起点)" -> "杭州东站"
+    const cleanStart = startName.split(/[(\uff08]/)[0].trim();
+    const cleanEnd = endName.split(/[(\uff08]/)[0].trim();
+
+    // 预估一个折中的站点数量
+    const calculatedStops = Math.max(3, Math.min(8, Math.round(defaultTime / 5)));
+    
+    // 假定一部分经停站名字
+    const dummyViaStops = [
+      `${cleanStart}外环`,
+      `${cleanCity}心大道`,
+      `${cleanEnd}前站`
+    ].slice(0, Math.max(1, calculatedStops - 1));
+
+    // 如果出发点是火车站或名字包含“站”，或者时间大于20分钟，默认为地铁，否则用公交
+    const isSubway = cleanStart.includes('站') || cleanEnd.includes('站') || defaultTime > 20;
+
+    if (isSubway) {
+      return [
+        { mode: 'WALK', distance: 150, time: 2 },
+        { 
+          mode: 'SUBWAY', 
+          lineName: `${cleanCity}地铁1号线`, 
+          stopCount: calculatedStops, 
+          direction: `${cleanEnd}方向`, 
+          onStation: cleanStart.endsWith('站') ? cleanStart : `${cleanStart}站`, 
+          offStation: cleanEnd.endsWith('站') ? cleanEnd : `${cleanEnd}站`, 
+          time: Math.max(5, defaultTime - 5), 
+          viaStops: dummyViaStops
+        },
+        { mode: 'WALK', distance: 220, time: 3 }
+      ];
+    } else {
+      return [
+        { mode: 'WALK', distance: 120, time: 2 },
+        { 
+          mode: 'BUS', 
+          lineName: `${cleanCity}公交1路`, 
+          stopCount: calculatedStops, 
+          direction: `${cleanEnd}方向`, 
+          onStation: cleanStart.endsWith('站') ? cleanStart : `${cleanStart}枢纽站`, 
+          offStation: cleanEnd.endsWith('站') ? cleanEnd : `${cleanEnd}枢纽站`, 
+          time: Math.max(5, defaultTime - 4), 
+          viaStops: dummyViaStops
+        },
+        { mode: 'WALK', distance: 180, time: 2 }
+      ];
+    }
+  };
+
+  const segments = routeData?.segments || getFallbackSegments();
 
   const subways = segments.filter((s: any) => s.mode === 'SUBWAY' || s.mode === 'BUS');
 
@@ -120,14 +170,17 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
     return acc;
   }, 0);
 
-  // 大厂官方地铁色值映射函数
-  const getSubwayColor = (name: string) => {
+  // 大厂官方交通（地铁/公交）色值映射函数
+  const getTransitColor = (name: string, mode?: string) => {
+    if (mode === 'BUS' || (!name.includes('线') && (name.includes('路') || name.includes('公交') || name.includes('专线') || name.includes('特') || name.includes('快')))) {
+      return { bg: 'bg-[#10B981]', text: 'text-white', hex: '#10B981' }; // 经典公交绿
+    }
     if (name.includes('1号线')) return { bg: 'bg-[#EF4444]', text: 'text-white', hex: '#EF4444' };
     if (name.includes('3号线')) return { bg: 'bg-[#008A90]', text: 'text-white', hex: '#008A90' };
     if (name.includes('4号线')) return { bg: 'bg-[#008A90]', text: 'text-white', hex: '#008A90' };
     if (name.includes('8号线')) return { bg: 'bg-[#008C4A]', text: 'text-white', hex: '#008C4A' };
     if (name.includes('10号线')) return { bg: 'bg-[#0072BC]', text: 'text-white', hex: '#0072BC' };
-    return { bg: 'bg-[#64748B]', text: 'text-white', hex: '#64748B' };
+    return { bg: 'bg-[#0284C7]', text: 'text-white', hex: '#0284C7' }; // 地铁/混合交通天蓝色
   };
 
   return (
@@ -139,10 +192,10 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
           全程{finalTime}分钟
         </div>
 
-        {/* 1:1 还原高德彩色地铁胶囊 */}
+        {/* 1:1 还原高德彩色公共交通胶囊 */}
         <div className="flex items-center space-x-2 flex-wrap">
           {subways.map((sub: any, index: number) => {
-            const colors = getSubwayColor(sub.lineName);
+            const colors = getTransitColor(sub.lineName, sub.mode);
             return (
               <React.Fragment key={index}>
                 {index > 0 && <span className="text-slate-300 text-xs font-bold font-sans">→</span>}
@@ -194,7 +247,6 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
           {/* 段内渲染 */}
           {segments.map((seg: any, index: number) => {
             if (seg.mode === 'WALK') {
-              const isLast = index === segments.length - 1;
               return (
                 <div key={index} className="flex space-x-3.5 items-start -my-1.5">
                   <div className="flex flex-col items-center shrink-0">
@@ -213,7 +265,7 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
             }
 
             if (seg.mode === 'SUBWAY' || seg.mode === 'BUS') {
-              const colors = getSubwayColor(seg.lineName);
+              const colors = getTransitColor(seg.lineName, seg.mode);
               const isSegOpen = !!segExpanded[index];
               const viaStops = seg.viaStops || [];
               
@@ -224,7 +276,11 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
                   <div className="flex space-x-3.5 items-start">
                     <div className="flex flex-col items-center shrink-0 mt-0.5">
                       <span className={`w-5 h-5 rounded-full ${colors.bg} flex items-center justify-center shadow-sm z-10`}>
-                        <Train className="w-3 h-3 text-white" />
+                        {seg.mode === 'BUS' ? (
+                          <Bus className="w-3 h-3 text-white" />
+                        ) : (
+                          <Train className="w-3 h-3 text-white" />
+                        )}
                       </span>
                       <div className="w-0.5 h-6" style={{ backgroundColor: colors.hex }}></div>
                     </div>
@@ -322,13 +378,15 @@ interface TimelineCardsProps {
   onSwapOrder: () => void;
   onShuffleNode: (nodeId: string, type: 'play' | 'eat') => void;
   isExecuting: boolean;
+  targetCity?: string;
 }
 
 export const TimelineCards: React.FC<TimelineCardsProps> = ({
   timeline,
   onSwapOrder,
   onShuffleNode,
-  isExecuting
+  isExecuting,
+  targetCity
 }) => {
   if (timeline.length === 0) return null;
 
@@ -367,9 +425,24 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
       {timeline.map((item, index) => {
         const isStart = index === 0 || item.node.id === 'start-node';
         const nodeType = item.node.type;
+        const showDayHeader = index === 0 || timeline[index - 1].day !== item.day;
 
         return (
           <React.Fragment key={item.node.id || index}>
+            {showDayHeader && (
+              <div className="flex items-center space-x-3.5 py-4 border-b border-slate-100/80 mb-2 mt-6 first:mt-0 animate-[fadeIn_0.3s_ease-out] select-none">
+                <div className="w-11 h-11 rounded-2xl bg-amber-500 flex flex-col items-center justify-center text-white shadow-md">
+                  <span className="text-[9px] font-black tracking-widest leading-none">DAY</span>
+                  <span className="text-lg font-black leading-none mt-0.5">{item.day || 1}</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 tracking-tight">第 {item.day || 1} 天行程安排</h3>
+                  <p className="text-[9.5px] text-slate-400 font-extrabold flex items-center space-x-1">
+                    <span>🕒 {item.day === 1 ? '一键开启精彩规划' : '08:30 AM 开启全新旅程'}</span>
+                  </p>
+                </div>
+              </div>
+            )}
             {/* 卡片渲染 */}
             <div className="flex space-x-3">
               {/* 左侧时间线轴线 */}
@@ -534,6 +607,11 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
                           <Train className="w-3 h-3 text-sky-500 animate-pulse" />
                           <span>🚇 地铁</span>
                         </>
+                      ) : item.travelModeToNext === 'bus' ? (
+                        <>
+                          <Bus className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                          <span>🚌 公交</span>
+                        </>
                       ) : (
                         <>
                           <Car className="w-3 h-3 text-amber-500" />
@@ -548,8 +626,8 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
                   </div>
                 </div>
 
-                {/* 如果是地铁，渲染高能1:1还原高德换乘的大厂极客级垂直时间轴组件！ */}
-                {item.travelModeToNext === 'subway' && (
+                {/* 如果是地铁或公交，渲染高能1:1还原高德换乘的大厂极客级垂直时间轴组件！ */}
+                {(item.travelModeToNext === 'subway' || item.travelModeToNext === 'bus') && (
                   <div className="flex space-x-3 -my-1 pb-2">
                     {/* 左侧垂直线轴的连贯性延长线 */}
                     <div className="w-8 flex justify-center shrink-0">
@@ -563,7 +641,7 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
                         startName={item.node.name}
                         endName={timeline[index + 1].node.name}
                         defaultTime={item.travelTimeToNext || 15}
-                        defaultDist={item.distanceToNext || 5}
+                        targetCity={targetCity}
                       />
                     </div>
                   </div>

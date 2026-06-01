@@ -72,6 +72,13 @@ export function CashierModal() {
           {bill.taxiPrice && (
             <BillRow title={c.taxiTitle} label={bill.taxiPrice.label} current={bill.taxiPrice.estimated} />
           )}
+          {bill.subwayPrice && (
+            <BillRow
+              title="绿色交通 (公交/地铁)"
+              label={bill.subwayPrice.label}
+              current={bill.subwayPrice.cost}
+            />
+          )}
         </div>
         <div className="flex justify-between items-baseline border-t border-slate-100 pt-4">
           <span className="text-sm font-bold text-slate-600">{c.totalLabel}</span>

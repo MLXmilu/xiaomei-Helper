@@ -10,12 +10,15 @@ export interface AIRecommendationNode {
   tags: string[];
   position: [number, number];
   type: 'play' | 'eat' | 'hotel'; // 明确节点类型
+  day?: number; // 建议游玩天数
 }
 
 // 定义解析出的结构化约束
 export interface AppConstraints {
   originalQuery: string;
   durationHours: number; // 默认 5 小时
+  durationDays?: number; // 建议的出行天数，默认 1
+  targetCity?: string;   // 目标城市，如“北京市”
   maxDistanceKm: number; // 离起点的最大公里数
   hasChild: boolean;     // 是否带娃
   hasSlimming: boolean;  // 是否减肥
@@ -25,7 +28,7 @@ export interface AppConstraints {
   isCoupleDate: boolean; // 情侣约会
   isChillRelax: boolean; // 松弛疗愈
   isBudgetSaver: boolean; // 高性价比 / 省钱
-  transportPreference: 'subway' | 'taxi' | 'walk' | 'auto'; // 出行工具偏好
+  transportPreference: 'subway' | 'taxi' | 'walk' | 'auto' | 'bus'; // 出行工具偏好
   nodes: AIRecommendationNode[]; // 核心节点序列，按建议游玩顺序排列（支持任意多个目的地！）
 }
 
@@ -44,10 +47,11 @@ export interface MeituanBusinessBill {
 // 行程时间节点接口
 export interface TimelineItem {
   time: string; // "14:00"
+  day: number;  // 标记当前节点所属的天数 (从 1 开始)
   node: LocationNode;
   duration: number; // 停留分钟
   travelTimeToNext?: number; // 到下个节点的交通时间(分钟)
-  travelModeToNext?: 'walk' | 'drive' | 'subway'; // 升级支持：步行、打车或地铁
+  travelModeToNext?: 'walk' | 'drive' | 'subway' | 'bus'; // 升级支持：步行、打车、地铁或公交
   travelLineDetails?: string; // 新增：具体交通线路详情（如“地铁8号线 天桥站->金鱼胡同站”）
   distanceToNext?: number; // 公里
   actionLabel: string; // 落地执行的动作文本
@@ -66,6 +70,8 @@ export interface ActivityPlan {
   friendsVibeScore: number;
   summaryText: string;
   businessBill: MeituanBusinessBill; // 美团打包总收银台账单
+  targetCity?: string;
+  durationDays?: number;
 }
 
 // 计算两点之间的几何距离并转化为公里 (支持高德真实经纬度 position 或 0-100 虚拟 coords)
@@ -133,143 +139,10 @@ export async function parseNaturalLanguageQuery(
 ): Promise<AppConstraints> {
   const lowercase = query.toLowerCase();
   
-  // A. 正则表达式分词本地解析兜底器 (防翻车，保证 100% 成功运行，并且能精准对齐北京多景点行程！)
-  const localFallback = (): AppConstraints => {
-    const profiles = mergeTravelProfiles(undefined, query);
 
-    // 智能提取交通方式偏好
-    let transportPreference: AppConstraints['transportPreference'] = 'auto';
-    if (/(地铁|地跌|坐地铁|乘地铁)/.test(lowercase)) {
-      transportPreference = 'subway';
-    } else if (/(打车|出租|专车|快车|自驾|开车)/.test(lowercase)) {
-      transportPreference = 'taxi';
-    } else if (/(步行|走路|散步)/.test(lowercase)) {
-      transportPreference = 'walk';
-    }
-
-    let durationHours = 5;
-    const hoursMatch = lowercase.match(/(\d+|一|二|三|四|五|六|七|八)\s*个?小时/);
-    if (hoursMatch) {
-      const parsed = parseInt(hoursMatch[1]);
-      if (!isNaN(parsed)) {
-        durationHours = parsed;
-      } else {
-        const cnMap: Record<string, number> = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8 };
-        durationHours = cnMap[hoursMatch[1]] || 5;
-      }
-    }
-
-    let maxDistanceKm = 5;
-    const distMatch = lowercase.match(/(\d+)\s*公里/);
-    if (distMatch) {
-      maxDistanceKm = parseInt(distMatch[1]);
-    } else if (/(不远|别太远|附近|离家近)/.test(lowercase)) {
-      maxDistanceKm = 3;
-    }
-
-    // 智能提取并组装多个强指定景点
-    const nodes: AIRecommendationNode[] = [];
-    
-    if (/(天坛)/.test(lowercase)) {
-      nodes.push({
-        name: '天坛公园',
-        description: '探索古代皇家祭祀文化，适合高中生历史学习之旅',
-        price: 15,
-        duration: 120,
-        tags: ['历史遗迹', '文化体验', '摄影胜地', '青年友好'],
-        position: [116.4108, 39.8725],
-        type: 'play'
-      });
-    }
-
-    // 如果提到了天坛、故宫或颐和园的多目的地，智能插入便宜坊就餐点
-    if (/(便宜坊|烤鸭|吃饭|就餐|餐厅)/.test(lowercase) || (/(天坛)/.test(lowercase) && /(故宫|颐和园)/.test(lowercase))) {
-      nodes.push({
-        name: '便宜坊烤鸭 (天坛店)',
-        description: '正宗北京烤鸭，经济实惠，方便游玩天坛后用餐',
-        price: 80,
-        duration: 80,
-        tags: ['北京风味', '经济实惠', '近景点', '口碑好'],
-        position: [116.4153, 39.8732],
-        type: 'eat'
-      });
-    }
-
-    if (/(故宫|紫禁城)/.test(lowercase)) {
-      nodes.push({
-        name: '故宫博物院',
-        description: '参观明清两代皇家宫殿，领略宏伟的宫廷建筑与历史珍宝',
-        price: 60,
-        duration: 150,
-        tags: ['故宫大开眼界', '国宝级展览', '世界文化遗产'],
-        position: [116.3974, 39.9180],
-        type: 'play'
-      });
-    }
-
-    if (/(颐和园)/.test(lowercase)) {
-      nodes.push({
-        name: '颐和园',
-        description: '漫步于皇家山水园林之中，欣赏十七孔桥与万寿山的精美景观',
-        price: 30,
-        duration: 120,
-        tags: ['皇家园林', '精美山水', '江南古风'],
-        position: [116.2730, 39.9920],
-        type: 'play'
-      });
-    }
-
-    // 提到了住宿或者属于天坛故宫颐和园的超级长途行程，自动插针高特惠酒店
-    if (/(住宿|酒店|全季|安缦|睡觉)/.test(lowercase) || (/(颐和园)/.test(lowercase) && /(故宫)/.test(lowercase))) {
-      nodes.push({
-        name: '全季酒店 (北京中关村颐和园店)',
-        description: '距离颐和园很近，环境清幽舒适，性价比高',
-        price: 280,
-        duration: 0,
-        tags: ['限时特惠', '品质连锁', '温馨舒适'],
-        position: [116.2760, 39.9880],
-        type: 'hotel'
-      });
-    }
-
-    // 如果什么都没匹配到，则依然回退到朝阳公园默认地标
-    if (nodes.length === 0) {
-      nodes.push({
-        name: '奈尔宝家庭中心 (蓝色港湾店)',
-        description: '国内顶奢室内儿童乐园，配有全职看护与高安全性设计。',
-        price: 198,
-        duration: 120,
-        tags: ['亲子乐园', '室内恒温', '高安全性'],
-        position: [116.479133, 39.953049],
-        type: 'play'
-      });
-      nodes.push({
-        name: '火烧云傣家菜 (蓝色港湾店)',
-        description: '超人气云南特色菜，排队狂魔，口味独特香辣开胃。',
-        price: 95,
-        duration: 80,
-        tags: ['排队爆满', '极佳口味', '云南风情'],
-        position: [116.4793, 39.9532],
-        type: 'eat'
-      });
-    }
-
-    // 跨区大北京线路，自动调大最大范围至 30 公里
-    const isBeijingRoute = /(天坛|故宫|颐和园)/.test(lowercase);
-    const finalMaxDistance = isBeijingRoute ? 30 : maxDistanceKm;
-
-    return {
-      originalQuery: query,
-      durationHours,
-      maxDistanceKm: finalMaxDistance,
-      ...profiles,
-      transportPreference,
-      nodes,
-    };
-  };
 
   if (!useAi) {
-    return localFallback();
+    throw new Error("标准模式没有本地硬编码路线可用。请开启右上角的「联网推荐」开关，体验AI自由行程规划！");
   }
 
   // B. 尝试利用用户配置的大模型接口进行语义结构化抽取 (流式输出版)
@@ -315,6 +188,8 @@ export async function parseNaturalLanguageQuery(
 输出的 JSON 结构必须为：
 {
   "durationHours": 数字，建议的周末出行总时长（几小时），若未提及则默认 5,
+  "durationDays": 数字，建议的周末出行总天数（几日游，如两日游为 2），若未提及则默认 1,
+  "targetCity": "字符串，目标城市名称，必须包含'市'（例如'北京市'、'杭州市'、'西安市'、'成都市'）。如果未在输入中提及具体城市，但提到了标志性景点如'西湖'则为'杭州市'，'兵马俑'则为'西安市'，均未提则默认'北京市'",
   "maxDistanceKm": 数字，离家/起点的最大公里数（北京跨区景点如天坛、故宫、颐和园跨度较大，若包含这类跨区景点请设为 30），若未提及则默认 5,
   "hasChild": 布尔值，是否带小孩/儿童/宝宝/学龄前/几岁娃,
   "hasSlimming": 布尔值，是否有减肥/瘦身/减脂/低盐低糖/轻食/沙拉等健康塑形需求,
@@ -324,16 +199,17 @@ export async function parseNaturalLanguageQuery(
   "isCoupleDate": 布尔值，是否是情侣约会、纪念日、浪漫二人世界,
   "isChillRelax": 布尔值，是否偏松弛疗愈、慢生活、露营看海、温泉发呆,
   "isBudgetSaver": 布尔值，是否强调省钱、性价比、预算有限,
-  "transportPreference": 字符串，"subway" | "taxi" | "walk" | "auto" 中的一个，如果用户强指定了出行方式如“坐地铁”则为 subway，提到“打车”则为 taxi，提到“步行/散步”则为 walk，未强指定则为 auto,
+  "transportPreference": 字符串，"subway" | "taxi" | "walk" | "auto" | "bus" 中的一个，如果用户强指定了出行方式如“坐地铁”则为 subway，若指定“坐公交/乘公交/坐公交车”则为 bus，提到“打车”则为 taxi，提到“步行/散步”则为 walk，未强指定则为 auto,
   "nodes": [
     {
-      "name": "真实好玩的景点、餐饮商户或酒店住宿名称。必须优先规划用户在心愿中指定的全部景点（例如用户同时指定了天坛、故宫、颐和园，必须在nodes序列中全部输出这三个景点，一个不能少！）。并在景点之间合适的位置智能插针规划就餐点（eat），若提到过夜、住宿或行程大于5小时，在最末尾智能推荐插针一个高品质住宿点（hotel）",
+      "name": "真实好玩的景点、餐饮商户或酒店住宿名称。必须优先规划用户在心愿中指定的全部景点（例如用户同时指定了天坛、故宫、颐和园，必须在nodes序列中全部输出这三个景点，一个不能少！）。并在景点之间合适的位置智能插针规划就餐点（eat）。若天数大于1天，必须在第1至N-1天晚间的合适位置智能推荐插针一个高品质住宿点（hotel）",
       "description": "为什么推荐这里的温馨推荐语 (不超过40字)",
       "price": 价格数字（如门票价格、餐人均消费或酒店单晚价格），例如150,
       "duration": 游玩或就餐建议停留分钟数数字（景点通常为120-180分钟，餐饮通常为80分钟，酒店住宿可为0）,
       "tags": ["适合标签，3-4个"],
-      "position": [经度, 纬度] (必须为真实的高德经纬度坐标数组。天坛高德坐标[116.4108, 39.8725]；故宫高德坐标[116.3974, 39.9180]；颐和园高德坐标[116.2730, 39.9920]。经度在前纬度在后，必须准确！),
-      "type": "play" | "eat" | "hotel"
+      "position": [经度, 纬度] (必须为真实的高德经纬度坐标数组。天坛高德坐标[116.4108, 39.8725]；故宫高德坐标[116.3974, 39.9180]；颐和园高德坐标[116.2730, 39.9920]。杭州西湖[120.145, 30.245]，雷峰塔[120.149, 30.218]，灵隐寺[120.096, 30.243]。经度在前纬度在后，必须精确预测所选城市的经纬度，不能局限在北京！),
+      "type": "play" | "eat" | "hotel",
+      "day": 数字，必须标记该节点属于第几天（若是一日游全部设为1；若是多日游，合理将景点分配在第1天、第2天等，且天数必须为整数，如1、2、3）
     }
   ]
 }`
@@ -408,12 +284,19 @@ export async function parseNaturalLanguageQuery(
     clearTimeout(timeoutId);
 
     const profiles = mergeTravelProfiles(parsedData, query);
-    const transportPreference = parsedData.transportPreference ?? (/(地铁|地跌|坐地铁|乘地铁)/.test(lowercase) ? 'subway' : /(打车|出租|专车|快车|自驾|开车)/.test(lowercase) ? 'taxi' : /(步行|走路|散步)/.test(lowercase) ? 'walk' : 'auto');
+    const transportPreference = parsedData.transportPreference ?? (
+      /(地铁|地跌|坐地铁|乘地铁)/.test(lowercase) ? 'subway' :
+      /(公交|坐公交|乘公交|巴士|公共汽车|做公交)/.test(lowercase) ? 'bus' :
+      /(打车|出租|专车|快车|自驾|开车)/.test(lowercase) ? 'taxi' :
+      /(步行|走路|散步)/.test(lowercase) ? 'walk' : 'auto'
+    );
 
     if (Array.isArray(parsedData.nodes) && parsedData.nodes.length > 0) {
       return {
         originalQuery: query,
         durationHours: parsedData.durationHours ?? 5,
+        durationDays: parsedData.durationDays ?? (/(两日游|二日游|两天)/.test(lowercase) ? 2 : /(三日游|三天)/.test(lowercase) ? 3 : 1),
+        targetCity: parsedData.targetCity ?? (/(杭州)/.test(lowercase) ? '杭州市' : /(西安)/.test(lowercase) ? '西安市' : /(成都)/.test(lowercase) ? '成都市' : '北京市'),
         maxDistanceKm: parsedData.maxDistanceKm ?? 5,
         ...profiles,
         transportPreference,
@@ -424,7 +307,8 @@ export async function parseNaturalLanguageQuery(
           duration: typeof n.duration === 'number' ? n.duration : 120,
           tags: Array.isArray(n.tags) ? n.tags : ["热门推荐"],
           position: Array.isArray(n.position) && n.position.length === 2 ? [Number(n.position[0]), Number(n.position[1])] : [116.4108, 39.8725],
-          type: n.type === 'eat' ? 'eat' : n.type === 'hotel' ? 'hotel' : 'play'
+          type: n.type === 'eat' ? 'eat' : n.type === 'hotel' ? 'hotel' : 'play',
+          day: typeof n.day === 'number' ? n.day : 1
         }))
       };
     } else {
@@ -436,8 +320,8 @@ export async function parseNaturalLanguageQuery(
     if (err.name === 'AbortError' || (abortSignal && abortSignal.aborted)) {
       throw err;
     }
-    console.error("AI service error, fallback to local:", err);
-    return localFallback();
+    console.error("AI service error:", err);
+    throw new Error(`AI出行规划服务暂时不可用：${err.message || '网络连接异常'}`);
   }
 }
 // 2. 多目标路线规划器 (包含美团多业务价格计算)
@@ -466,12 +350,37 @@ export function generateSmartPlan(
   }
 
   // 2. 确定起点
-  // 如果第一站是北京跨区地标，我们将起点模拟在第一站附近的一个“高中生宿舍”或者“北京南站”
   const firstNode = orderedNodes[0];
-  const isBeijingRoute = firstNode && /(天坛|故宫|颐和园)/.test(firstNode.name);
+  const targetCity = constraints.targetCity || '北京市';
   
-  const startPosition: [number, number] = isBeijingRoute ? [116.3790, 39.8650] : START_COORDS.position || [116.479, 39.952]; // 北京南站 / 朝阳公园
-  const startName = isBeijingRoute ? '北京南站 (宿舍起点)' : '从温暖的家出发';
+  let startPosition: [number, number] = [116.3790, 39.8650]; // 默认北京南站
+  let startName = '北京南站 (出发起点)';
+  let startDesc = '周六清晨，开启充满期待的北京经典游学之旅！';
+
+  if (targetCity === '杭州市') {
+    startPosition = [120.21, 30.24]; // 杭州东站
+    startName = '杭州东站 (出发起点)';
+    startDesc = '清晨开启充满期待的诗画江南游学之旅！';
+  } else if (targetCity === '西安市') {
+    startPosition = [108.97, 34.28]; // 西安站
+    startName = '西安站 (出发起点)';
+    startDesc = '清晨开启充满期待的十三朝古都史诗之旅！';
+  } else if (targetCity === '成都市') {
+    startPosition = [104.07, 30.65]; // 成都站
+    startName = '成都站 (出发起点)';
+    startDesc = '清晨开启充满期待的蓉城巴蜀悠闲之旅！';
+  } else if (targetCity === '北京市') {
+    const isBeijingRoute = firstNode && /(天坛|故宫|颐和园|鸟巢)/.test(firstNode.name);
+    startPosition = isBeijingRoute ? [116.3790, 39.8650] : (START_COORDS.position || [116.479, 39.952]);
+    startName = isBeijingRoute ? '北京南站 (宿舍起点)' : '从温暖的家出发';
+    startDesc = isBeijingRoute ? '周六清晨，开启充满期待的北京经典历史文化游学之旅！' : '今日出行规划：已智能收敛至离家合理范围内的优质成熟商圈，避开无谓的舟车劳顿。';
+  } else {
+    // 降级，从目标景点附近的一个枢纽出发
+    const nodePos = firstNode?.position || [116.40, 39.90];
+    startPosition = [nodePos[0] - 0.02, nodePos[1] - 0.02];
+    startName = `${targetCity.slice(0, 2)}站 (出发起点)`;
+    startDesc = `清晨开启充满期待的${targetCity.slice(0, 2)}精彩之旅！`;
+  }
 
   const startNode: LocationNode = {
     id: 'start-node',
@@ -483,7 +392,7 @@ export function generateSmartPlan(
     price: 0,
     duration: 0,
     suitableFor: ['all'],
-    description: isBeijingRoute ? '周六清晨，开启充满期待的北京经典历史文化游学之旅！' : '今日出行规划：已智能收敛至离家合理范围内的优质成熟商圈，避开无谓的舟车劳顿。',
+    description: startDesc,
     realtimeStatus: { availability: 'available', queueTables: 0, queueWaitMinutes: 0 }
   };
 
@@ -500,6 +409,7 @@ export function generateSmartPlan(
   };
 
   const timeline: TimelineItem[] = [];
+  let activeDay = 1;
 
   // 4. 依次构建时间轴
   let prevPos = startPosition;
@@ -533,12 +443,18 @@ export function generateSmartPlan(
   for (let i = 0; i < orderedNodes.length; i++) {
     const nodeData = orderedNodes[i];
     
+    const currentDay = nodeData.day || 1;
+    if (currentDay !== activeDay) {
+      activeDay = currentDay;
+      currentMinutes = 8 * 60 + 30; // 新的一天，早上 08:30 准时出发！
+    }
+    
     // 计算上一节点到当前节点的交通信息
     const dist = calculateDistance({ x: 50, y: 50, position: prevPos }, { x: 50, y: 50, position: nodeData.position });
     totalDistance += dist;
 
     // 智能决策交通方式
-    let travelMode: 'walk' | 'drive' | 'subway' = 'drive';
+    let travelMode: 'walk' | 'drive' | 'subway' | 'bus' = 'drive';
     let travelTime = 15;
     let cost = 0;
     let details = '';
@@ -547,6 +463,37 @@ export function generateSmartPlan(
       travelMode = 'walk';
       travelTime = Math.max(3, Math.round((dist / 4.5) * 60 + 2));
       details = `🚶 步行前往下一站 (约 ${dist}公里，用时 ${travelTime}分钟)`;
+    } else if (constraints.transportPreference === 'bus') {
+      travelMode = 'bus';
+      travelTime = Math.round((dist / 20) * 60 + 15); // 公交车速预估 20km/h，等待多 15 分钟
+      cost = 2 * personCount; // 公交票价 2元起步
+      subwayCost += cost;
+
+      // 智能猜测公交路线
+      let lineFrom = '公交车';
+      let stationFrom = '乘车点';
+      let stationTo = '目的站';
+
+      if (targetCity === '北京市') {
+        if (prevName.includes('天坛')) { lineFrom = '120路'; stationFrom = '天坛西门站'; }
+        else if (prevName.includes('故宫')) { lineFrom = '2路'; stationFrom = '东华门站'; }
+        else if (prevName.includes('颐和园')) { lineFrom = '332路'; stationFrom = '颐和园新建宫门站'; }
+        else if (prevName.includes('北京南站')) { lineFrom = '20路'; stationFrom = '北京南站'; }
+        else { lineFrom = '特11路'; stationFrom = '附近公交站'; }
+
+        if (nodeData.name.includes('天坛')) { stationTo = '天桥站'; }
+        else if (nodeData.name.includes('故宫')) { stationTo = '金鱼胡同站'; }
+        else if (nodeData.name.includes('颐和园')) { stationTo = '北宫门站'; }
+        else if (nodeData.name.includes('便宜坊')) { stationTo = '天桥站'; }
+        else { stationTo = '就近公交站'; }
+      } else {
+        const cityShort = targetCity.slice(0, 2);
+        lineFrom = `${cityShort}公交 1路`;
+        stationFrom = `${prevName.split('(')[0].split('店')[0].trim()}公交站`;
+        stationTo = `${nodeData.name.split('(')[0].split('店')[0].trim()}公交站`;
+      }
+
+      details = `🚌 乘坐 ${lineFrom} (从 ${stationFrom} ──> ${stationTo}，票价 ¥${cost}，约 ${travelTime}分钟)`;
     } else if (constraints.transportPreference === 'subway' || dist > 4.5) {
       travelMode = 'subway';
       travelTime = Math.round((dist / 28) * 60 + 12);
@@ -558,17 +505,24 @@ export function generateSmartPlan(
       let stationFrom = '乘车点';
       let stationTo = '目的站';
 
-      if (prevName.includes('天坛')) { lineFrom = '地铁 8 号线'; stationFrom = '天桥站'; }
-      else if (prevName.includes('故宫')) { lineFrom = '地铁 8 号线'; stationFrom = '金鱼胡同站'; }
-      else if (prevName.includes('颐和园')) { lineFrom = '地铁 4 号线'; stationFrom = '北宫门站'; }
-      else if (prevName.includes('北京南站')) { lineFrom = '地铁 4 号线'; stationFrom = '北京南站'; }
-      else { lineFrom = '地铁 10 号线'; stationFrom = '附近地铁站'; }
+      if (targetCity === '北京市') {
+        if (prevName.includes('天坛')) { lineFrom = '地铁 8 号线'; stationFrom = '天桥站'; }
+        else if (prevName.includes('故宫')) { lineFrom = '地铁 8 号线'; stationFrom = '金鱼胡同站'; }
+        else if (prevName.includes('颐和园')) { lineFrom = '地铁 4 号线'; stationFrom = '北宫门站'; }
+        else if (prevName.includes('北京南站')) { lineFrom = '地铁 4 号线'; stationFrom = '北京南站'; }
+        else { lineFrom = '地铁 10 号线'; stationFrom = '附近地铁站'; }
 
-      if (nodeData.name.includes('天坛')) { stationTo = '天桥站'; }
-      else if (nodeData.name.includes('故宫')) { stationTo = '金鱼胡同站'; }
-      else if (nodeData.name.includes('颐和园')) { stationTo = '北宫门站'; }
-      else if (nodeData.name.includes('便宜坊')) { stationTo = '天桥站'; }
-      else { stationTo = '就近地铁站'; }
+        if (nodeData.name.includes('天坛')) { stationTo = '天桥站'; }
+        else if (nodeData.name.includes('故宫')) { stationTo = '金鱼胡同站'; }
+        else if (nodeData.name.includes('颐和园')) { stationTo = '北宫门站'; }
+        else if (nodeData.name.includes('便宜坊')) { stationTo = '天桥站'; }
+        else { stationTo = '就近地铁站'; }
+      } else {
+        const cityShort = targetCity.slice(0, 2);
+        lineFrom = `${cityShort}地铁 1号线`;
+        stationFrom = `${prevName.split('(')[0].split('店')[0].trim()}站`;
+        stationTo = `${nodeData.name.split('(')[0].split('店')[0].trim()}站`;
+      }
 
       details = `🚇 乘坐 ${lineFrom} (从 ${stationFrom} ──> ${stationTo}，票价 ¥${cost}，约 ${travelTime}分钟)`;
     } else {
@@ -584,6 +538,7 @@ export function generateSmartPlan(
       // 第一段是从起点出发
       timeline.push({
         time: formatTime(currentMinutes),
+        day: 1,
         node: startNode,
         duration: 0,
         travelTimeToNext: travelTime,
@@ -648,6 +603,7 @@ export function generateSmartPlan(
 
     timeline.push({
       time: formatTime(currentMinutes),
+      day: activeDay,
       node: lNode,
       duration: nodeData.duration,
       actionLabel,
@@ -753,7 +709,9 @@ export function generateSmartPlan(
     childFriendlyScore,
     friendsVibeScore,
     summaryText,
-    businessBill
+    businessBill,
+    targetCity: constraints.targetCity || '北京市',
+    durationDays: constraints.durationDays || 1
   };
 }
 

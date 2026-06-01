@@ -58,8 +58,6 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
         </div>
       </div>
 
-      {useAi && !compact && <ProfileInputGuide onPickExample={pickExample} />}
-
       <div className={`relative bg-white rounded-2xl border-2 flex items-end shadow-sm transition-all ${
         useAi ? 'border-amber-200 focus-within:border-amber-300' : 'border-slate-200 focus-within:border-meituan/60'
       }`}>
@@ -96,6 +94,8 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
           </button>
         </div>
       </div>
+
+      {useAi && !compact && <ProfileInputGuide onPickExample={pickExample} />}
 
       {!useAi && (
         <>

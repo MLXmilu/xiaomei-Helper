@@ -7,6 +7,7 @@ interface MapContainerProps {
   isExecuting: boolean;
   /** 铺满父容器高度（用于行程规划页主地图区） */
   fill?: boolean;
+  targetCity?: string;
 }
 
 declare global {
@@ -15,7 +16,7 @@ declare global {
   }
 }
 
-export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecuting, fill = false }) => {
+export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecuting, fill = false, targetCity }) => {
   const mapRef = useRef<any>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<any[]>([]);
@@ -211,7 +212,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
                 // 调用高德官方 AMap.Transfer 进行真实的公交/地铁划线
                 const transfer = new window.AMap.Transfer({
                   map: mapInstance,
-                  city: '北京市',
+                  city: targetCity || '北京市',
                   hideMarkers: true,
                   autoFitView: false,
                   policy: window.AMap.TransferPolicy.LEAST_TIME

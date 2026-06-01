@@ -1,0 +1,22 @@
+{
+  "models": [
+    {
+      "id": "mimo-v2.5-pro",
+      "name": "mimo-v2.5-pro",
+      "vendor": "MiMo",
+      "apiKey": "tp-cvjmp0pf6zdbckc0t1pskq62whfu1nngbtijv7yquol8ng71",
+      "url": "https://token-plan-cn.xiaomimimo.com/v1",
+      "supportsToolCall": true,
+      "supportsImages": false
+    },
+    {
+      "id": "mimo-v2.5",
+      "name": "mimo-v2.5",
+      "vendor": "MiMo",
+      "apiKey": "tp-cvjmp0pf6zdbckc0t1pskq62whfu1nngbtijv7yquol8ng71",
+      "url": "https://token-plan-cn.xiaomimimo.com/v1",
+      "supportsToolCall": true,
+      "supportsImages": true
+    }
+  ]
+}

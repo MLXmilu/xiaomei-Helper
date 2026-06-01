@@ -38,23 +38,24 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="md:col-span-3 md:col-start-7">
-            <h4 className="text-sm font-bold text-slate-900 mb-4">产品功能</h4>
-            <ul className="space-y-2.5 text-sm text-slate-500">
-              <li>智能排行程</li>
-              <li>高德地图路线</li>
-              <li>一键全包下单</li>
-              <li>方案回溯</li>
-            </ul>
-          </div>
-
-          <div className="md:col-span-2">
-            <h4 className="text-sm font-bold text-slate-900 mb-4">技术栈</h4>
-            <ul className="space-y-2.5 text-sm text-slate-500">
-              <li>React + TypeScript</li>
-              <li>高德地图</li>
-              <li>Vite + Tailwind</li>
-            </ul>
+          <div className="md:col-span-5 md:col-start-7 flex gap-10">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 mb-4">产品功能</h4>
+              <ul className="space-y-2.5 text-sm text-slate-500">
+                <li>智能排行程</li>
+                <li>高德地图路线</li>
+                <li>一键全包下单</li>
+                <li>方案回溯</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-900 mb-4">技术栈</h4>
+              <ul className="space-y-2.5 text-sm text-slate-500">
+                <li>React + TypeScript</li>
+                <li>高德地图</li>
+                <li>Vite + Tailwind</li>
+              </ul>
+            </div>
           </div>
         </div>
 

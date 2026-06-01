@@ -14,6 +14,8 @@ export const HISTORY_COPY = {
   pageTitle: '决策历史',
   pageSubtitle: '仅展示与 AI 管家小美的对话规划记录',
   clearAll: '清空全部',
+  deleteSelected: '删除选中',
+  selectAll: '全选',
   emptyEmoji: '💬',
   emptyTitle: '暂无数据',
   emptyDesc: '请先在「行程规划」开启智能推荐并完成一次 AI 对话，记录会自动出现在这里',
