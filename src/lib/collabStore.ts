@@ -1,5 +1,8 @@
 import type { AppConstraints } from '../agentEngine';
 
+// 由 Vite 自动注入的本机局域网 IP
+declare const __LOCAL_IP__: string;
+
 /** 家人提交的偏好反馈结构 */
 export interface CollabFeedback {
   id: string;
@@ -48,8 +51,20 @@ export function decodeConstraints(encoded: string): AppConstraints | null {
 
 /** 构建家人专属的协同链接 */
 export function buildCollabUrl(sessionId: string, constraints: AppConstraints): string {
-  const encoded = encodeConstraints(constraints);
-  const base = `${window.location.origin}/collab`;
+  // 极简提取协同页面展示所必需的字段，避免编码过长导致二维码 Data too long 报错
+  const lightweightConstraints = {
+    originalQuery: constraints.originalQuery,
+    nodes: constraints.nodes.slice(0, 6).map(n => ({
+      name: n.name,
+      type: n.type,
+      duration: n.duration,
+      price: n.price
+    }))
+  };
+  const encoded = encodeConstraints(lightweightConstraints as any);
+  // 使用真实的局域网 IP
+  const host = typeof __LOCAL_IP__ !== 'undefined' ? __LOCAL_IP__ : window.location.hostname;
+  const base = `http://${host}:${window.location.port || 5173}/collab`;
   return `${base}#s=${sessionId}&d=${encoded}`;
 }
 
@@ -60,23 +75,27 @@ export function parseCollabHash(): { sessionId: string | null; encoded: string |
   return { sessionId: params.get('s'), encoded: params.get('d') };
 }
 
-/** 家人端：提交反馈（写入 localStorage + BroadcastChannel 广播） */
-export function writeFeedback(sessionId: string, feedback: CollabFeedback): void {
+/** 家人端：提交反馈（真实发送到局域网 API） */
+export async function writeFeedback(sessionId: string, feedback: CollabFeedback): Promise<void> {
+  // 仍然保留一份在本地，防止断网时崩溃
   const existing = readFeedbacks(sessionId);
   existing.push(feedback);
   localStorage.setItem(LS_PREFIX + sessionId, JSON.stringify(existing));
 
-  // 同浏览器跨 Tab 实时通知
+  // 跨设备核心：发往 Vite 后端 API
   try {
-    const channel = new BroadcastChannel(CHANNEL_PREFIX + sessionId);
-    channel.postMessage({ type: 'new_feedback', feedback });
-    setTimeout(() => channel.close(), 200);
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    await fetch(`${apiUrl}/api/feedback/${sessionId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(feedback)
+    });
   } catch {
-    // BroadcastChannel 不支持时静默失败
+    console.error('Failed to sync feedback to PC');
   }
 }
 
-/** 规划者端：读取指定 session 的所有反馈 */
+/** 规划者端：读取本地缓存的反馈（现在主要作为备用） */
 export function readFeedbacks(sessionId: string): CollabFeedback[] {
   try {
     const raw = localStorage.getItem(LS_PREFIX + sessionId);
@@ -91,23 +110,39 @@ export function clearFeedbacks(sessionId: string): void {
   localStorage.removeItem(LS_PREFIX + sessionId);
 }
 
-/** 订阅 BroadcastChannel，返回取消订阅函数 */
+/** 订阅 API 轮询，返回取消订阅函数 */
 export function subscribeFeedbackChannel(
   sessionId: string,
   onFeedback: (feedback: CollabFeedback) => void
 ): () => void {
-  let channel: BroadcastChannel | null = null;
-  try {
-    channel = new BroadcastChannel(CHANNEL_PREFIX + sessionId);
-    channel.onmessage = (evt) => {
-      if (evt.data?.type === 'new_feedback' && evt.data.feedback) {
-        onFeedback(evt.data.feedback as CollabFeedback);
+  let isCancelled = false;
+  let seenIds = new Set<string>();
+
+  const poll = async () => {
+    if (isCancelled) return;
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/feedback/${sessionId}`);
+      if (res.ok) {
+        const data: CollabFeedback[] = await res.json();
+        data.forEach(fb => {
+          if (!seenIds.has(fb.id)) {
+            seenIds.add(fb.id);
+            onFeedback(fb);
+          }
+        });
       }
-    };
-  } catch {
-    // BroadcastChannel 不支持
-  }
+    } catch {
+      // ignore
+    }
+    if (!isCancelled) {
+      setTimeout(poll, 1500); // 每 1.5 秒轮询一次
+    }
+  };
+
+  poll();
+
   return () => {
-    try { channel?.close(); } catch { /* ignore */ }
+    isCancelled = true;
   };
 }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Home, Compass, UtensilsCrossed, ArrowDownUp, 
   RefreshCw, Clock, DollarSign, Users, AlertTriangle,
-  Train, Car, Footprints, Bus
+  Train, Car, Footprints, Bus, Plane
 } from 'lucide-react';
 import type { TimelineItem } from '../agentEngine';
 
@@ -600,29 +600,40 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
                       {item.travelModeToNext === 'walk' ? (
                         <>
                           <Footprints className="w-3 h-3 text-slate-500" />
-                          <span>🚶 步行</span>
+                          <span>步行</span>
                         </>
                       ) : item.travelModeToNext === 'subway' ? (
                         <>
                           <Train className="w-3 h-3 text-sky-500 animate-pulse" />
-                          <span>🚇 地铁</span>
+                          <span>地铁</span>
                         </>
                       ) : item.travelModeToNext === 'bus' ? (
                         <>
                           <Bus className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
-                          <span>🚌 公交</span>
+                          <span>公交</span>
+                        </>
+                      ) : item.travelModeToNext === 'intercity' ? (
+                        <>
+                          <Plane className="w-3.5 h-3.5 text-indigo-500 animate-pulse" />
+                          <span>跨城大交通</span>
                         </>
                       ) : (
                         <>
                           <Car className="w-3 h-3 text-amber-500" />
-                          <span>🚗 打车</span>
+                          <span>打车</span>
                         </>
                       )}
                     </span>
-                    <span>{item.distanceToNext} 公里</span>
-                    <span className="text-slate-400 font-normal">
-                      ({item.travelTimeToNext}分钟路程)
-                    </span>
+                    {item.travelModeToNext === 'intercity' ? (
+                      <span className="text-slate-400 font-normal ml-1">请自行安排前往目的城市</span>
+                    ) : (
+                      <>
+                        <span>{item.distanceToNext} 公里</span>
+                        <span className="text-slate-400 font-normal">
+                          ({item.travelTimeToNext}分钟路程)
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
 

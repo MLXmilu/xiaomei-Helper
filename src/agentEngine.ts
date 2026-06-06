@@ -19,6 +19,7 @@ export interface AppConstraints {
   durationHours: number; // 默认 5 小时
   durationDays?: number; // 建议的出行天数，默认 1
   targetCity?: string;   // 目标城市，如“北京市”
+  departureCity?: string; // 出发城市，如“任丘市”
   maxDistanceKm: number; // 离起点的最大公里数
   hasChild: boolean;     // 是否带娃
   hasSlimming: boolean;  // 是否减肥
@@ -51,7 +52,7 @@ export interface TimelineItem {
   node: LocationNode;
   duration: number; // 停留分钟
   travelTimeToNext?: number; // 到下个节点的交通时间(分钟)
-  travelModeToNext?: 'walk' | 'drive' | 'subway' | 'bus'; // 升级支持：步行、打车、地铁或公交
+  travelModeToNext?: 'walk' | 'drive' | 'subway' | 'bus' | 'intercity'; // 升级支持跨城大交通
   travelLineDetails?: string; // 新增：具体交通线路详情（如“地铁8号线 天桥站->金鱼胡同站”）
   distanceToNext?: number; // 公里
   actionLabel: string; // 落地执行的动作文本
@@ -161,18 +162,14 @@ export async function parseNaturalLanguageQuery(
       }
     }
 
-    // 智能拼接 baseUrl，保证不管是相对路径还是绝对路径均能完美拼接
-    let url = AI_CONFIG.baseURL;
-    if (url.endsWith('/')) {
-      url = url.slice(0, -1);
-    }
-    const targetUrl = `${url}/chat/completions`;
+    // 改为请求自建后端的 /api/chat 接口，隐藏真实 API Key
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    const targetUrl = `${apiUrl}/api/chat`;
 
     const response = await fetch(targetUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${AI_CONFIG.apiKey}`,
         "Accept": "text/event-stream"
       },
       signal: controller.signal,
@@ -190,6 +187,7 @@ export async function parseNaturalLanguageQuery(
   "durationHours": 数字，建议的周末出行总时长（几小时），若未提及则默认 5,
   "durationDays": 数字，建议的周末出行总天数（几日游，如两日游为 2），若未提及则默认 1,
   "targetCity": "字符串，目标城市名称，必须包含'市'（例如'北京市'、'杭州市'、'西安市'、'成都市'）。如果未在输入中提及具体城市，但提到了标志性景点如'西湖'则为'杭州市'，'兵马俑'则为'西安市'，均未提则默认'北京市'",
+  "departureCity": "字符串，出发城市名称（如'任丘市'、'沧州市'），若用户在句子中明确提到了'从XX出发'则提取出具体的出发地名称，若未明确提及出发地则返回null",
   "maxDistanceKm": 数字，离家/起点的最大公里数（北京跨区景点如天坛、故宫、颐和园跨度较大，若包含这类跨区景点请设为 30），若未提及则默认 5,
   "hasChild": 布尔值，是否带小孩/儿童/宝宝/学龄前/几岁娃,
   "hasSlimming": 布尔值，是否有减肥/瘦身/减脂/低盐低糖/轻食/沙拉等健康塑形需求,
@@ -207,12 +205,18 @@ export async function parseNaturalLanguageQuery(
       "price": 价格数字（如门票价格、餐人均消费或酒店单晚价格），例如150,
       "duration": 游玩或就餐建议停留分钟数数字（景点通常为120-180分钟，餐饮通常为80分钟，酒店住宿可为0）,
       "tags": ["适合标签，3-4个"],
-      "position": [经度, 纬度] (必须为真实的高德经纬度坐标数组。天坛高德坐标[116.4108, 39.8725]；故宫高德坐标[116.3974, 39.9180]；颐和园高德坐标[116.2730, 39.9920]。杭州西湖[120.145, 30.245]，雷峰塔[120.149, 30.218]，灵隐寺[120.096, 30.243]。经度在前纬度在后，必须精确预测所选城市的经纬度，不能局限在北京！),
+      "position": [经度, 纬度] (必须为真实的高德经纬度坐标数组。天坛高德坐标[116.4108, 39.8725]；故宫高德坐标[116.3974, 39.9180]；颐和园高德坐标[116.2730, 39.9920]。杭州西湖[120.145, 30.245]，雷峰塔[120.149, 30.218]，灵隐寺[120.096, 30.243]。上海外滩[121.490, 31.240]，东方明珠[121.499, 31.240]，豫园[121.492, 31.227]，迪士尼[121.668, 31.145]。经度在前纬度在后，必须精确预测所选城市的经纬度，不能局限在北京！),
       "type": "play" | "eat" | "hotel",
       "day": 数字，必须标记该节点属于第几天（若是一日游全部设为1；若是多日游，合理将景点分配在第1天、第2天等，且天数必须为整数，如1、2、3）
     }
   ]
-}`
+}
+
+【节点数量硬性要求】根据durationDays生成足够多的高质量节点，节点稀少将导致行程无效：
+- 1天行程：至少输出 4-6 个节点（2-3个play景点 + 1-2个eat就餐点）
+- 2天行程：至少输出 8-12 个节点（每天3-4个play景点 + 每天1-2个eat就餐点 + 1个hotel住宿）
+- 3天行程：至少输出 12-16 个节点（每天3-4个play + 每天1-2个eat + 2个hotel）
+每天的节点必须用day字段正确区分（day:1、day:2、day:3）。节点数量不够则必须补充更多景点！`
           },
           {
             role: "user",
@@ -296,7 +300,20 @@ export async function parseNaturalLanguageQuery(
         originalQuery: query,
         durationHours: parsedData.durationHours ?? 5,
         durationDays: parsedData.durationDays ?? (/(两日游|二日游|两天)/.test(lowercase) ? 2 : /(三日游|三天)/.test(lowercase) ? 3 : 1),
-        targetCity: parsedData.targetCity ?? (/(杭州)/.test(lowercase) ? '杭州市' : /(西安)/.test(lowercase) ? '西安市' : /(成都)/.test(lowercase) ? '成都市' : '北京市'),
+        targetCity: parsedData.targetCity ?? (
+          /(上海)/.test(lowercase) ? '上海市' :
+          /(杭州)/.test(lowercase) ? '杭州市' :
+          /(西安)/.test(lowercase) ? '西安市' :
+          /(成都)/.test(lowercase) ? '成都市' :
+          /(南京)/.test(lowercase) ? '南京市' :
+          /(广州)/.test(lowercase) ? '广州市' :
+          /(深圳)/.test(lowercase) ? '深圳市' :
+          /(武汉)/.test(lowercase) ? '武汉市' :
+          /(重庆)/.test(lowercase) ? '重庆市' :
+          /(西藏|拉萨)/.test(lowercase) ? '拉萨市' :
+          '北京市'
+        ),
+        departureCity: parsedData.departureCity ?? null,
         maxDistanceKm: parsedData.maxDistanceKm ?? 5,
         ...profiles,
         transportPreference,
@@ -352,15 +369,25 @@ export function generateSmartPlan(
   // 2. 确定起点
   const firstNode = orderedNodes[0];
   const targetCity = constraints.targetCity || '北京市';
+  const departureCity = constraints.departureCity;
   
   let startPosition: [number, number] = [116.3790, 39.8650]; // 默认北京南站
   let startName = '北京南站 (出发起点)';
   let startDesc = '周六清晨，开启充满期待的北京经典游学之旅！';
 
-  if (targetCity === '杭州市') {
+  if (departureCity) {
+    const nodePos = firstNode?.position || [116.40, 39.90];
+    startPosition = [nodePos[0] - 0.05, nodePos[1] - 0.05];
+    startName = `${departureCity}站 (出发起点)`;
+    startDesc = `清晨从${departureCity}出发，开启充满期待的精彩之旅！`;
+  } else if (targetCity === '杭州市') {
     startPosition = [120.21, 30.24]; // 杭州东站
     startName = '杭州东站 (出发起点)';
     startDesc = '清晨开启充满期待的诗画江南游学之旅！';
+  } else if (targetCity === '上海市') {
+    startPosition = [121.3210, 31.1979]; // 上海虹桥站
+    startName = '上海虹桥站 (出发起点)';
+    startDesc = '清晨开启充满期待的魔都上海精彩之旅！';
   } else if (targetCity === '西安市') {
     startPosition = [108.97, 34.28]; // 西安站
     startName = '西安站 (出发起点)';
@@ -450,16 +477,21 @@ export function generateSmartPlan(
     }
     
     // 计算上一节点到当前节点的交通信息
-    const dist = calculateDistance({ x: 50, y: 50, position: prevPos }, { x: 50, y: 50, position: nodeData.position });
+    let dist = calculateDistance({ x: 50, y: 50, position: prevPos }, { x: 50, y: 50, position: nodeData.position });
     totalDistance += dist;
 
     // 智能决策交通方式
-    let travelMode: 'walk' | 'drive' | 'subway' | 'bus' = 'drive';
+    let travelMode: 'walk' | 'drive' | 'subway' | 'bus' | 'intercity' = 'drive';
     let travelTime = 15;
     let cost = 0;
     let details = '';
 
-    if (dist <= 1.0) {
+    if (i === 0 && departureCity && departureCity !== targetCity && departureCity !== targetCity.replace('市', '')) {
+      travelMode = 'intercity';
+      travelTime = 0;
+      dist = 0;
+      details = `✈️ 长途大交通 (从 ${departureCity} 前往 ${targetCity}，大交通行程请自行安排)`;
+    } else if (dist <= 1.0) {
       travelMode = 'walk';
       travelTime = Math.max(3, Math.round((dist / 4.5) * 60 + 2));
       details = `🚶 步行前往下一站 (约 ${dist}公里，用时 ${travelTime}分钟)`;
