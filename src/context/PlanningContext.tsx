@@ -88,7 +88,7 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const [simulateError, setSimulateError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [useAi, setUseAi] = useState(false);
+  const [useAi, setUseAi] = useState(true);
   const [showCashierModal, setShowCashierModal] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -101,20 +101,34 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
   const recognitionRef = useRef<any>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
+  // 从后端拉取历史记录
+  const fetchHistory = async () => {
     try {
-      const stored = localStorage.getItem('meituan_ai_history');
-      if (stored) {
-        const parsed: HistoryItem[] = JSON.parse(stored);
-        const aiOnly = parsed.filter(item => item.isAi === true);
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/history`);
+      if (res.ok) {
+        const data: HistoryItem[] = await res.json();
+        const aiOnly = data.filter(item => item.isAi === true);
         setHistoryList(aiOnly);
-        if (aiOnly.length !== parsed.length) {
-          localStorage.setItem('meituan_ai_history', JSON.stringify(aiOnly));
-        }
+        // 为了防备断网或演示无后端环境，同时同步一份到 localStorage
+        localStorage.setItem('meituan_ai_history', JSON.stringify(aiOnly));
+      } else {
+        throw new Error(`Server returned ${res.status}`);
       }
     } catch (e) {
-      console.error('Failed to load history:', e);
+      console.error('Failed to load history from DB, fallback to localStorage:', e);
+      try {
+        const stored = localStorage.getItem('meituan_ai_history');
+        if (stored) {
+          const parsed: HistoryItem[] = JSON.parse(stored);
+          setHistoryList(parsed.filter(item => item.isAi === true));
+        }
+      } catch (err) {}
     }
+  };
+
+  useEffect(() => {
+    fetchHistory();
   }, []);
 
   useEffect(() => {
@@ -209,11 +223,23 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
           isAi: true,
           aiLogs: logsToAdd,
         };
+        
+        // 乐观更新前端状态并保存到 localStorage
         setHistoryList(prev => {
           const updated = [newHistoryItem, ...prev.filter(i => i.query !== targetQuery)].slice(0, 20);
           localStorage.setItem('meituan_ai_history', JSON.stringify(updated));
           return updated;
         });
+
+        // 异步保存到后端数据库
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          fetch(`${apiUrl}/api/history`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newHistoryItem)
+          }).catch(e => console.error('Failed to save history to DB', e));
+        } catch (e) {}
       }
     } catch (err: any) {
       if (err.name === 'AbortError' || controller.signal.aborted) {

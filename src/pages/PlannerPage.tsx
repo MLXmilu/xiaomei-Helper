@@ -49,7 +49,7 @@ export function PlannerPage() {
         </div>
 
         <div className="grid lg:grid-cols-[360px_1fr] gap-6">
-          <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+          <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start lg:h-[calc(100vh-180px)] lg:overflow-y-auto custom-scrollbar lg:pr-2 pb-8">
             <SearchPanel />
             <div className="glass-panel p-4">
               <HistoryRail vertical />

@@ -30,6 +30,7 @@ export interface AppConstraints {
   isChillRelax: boolean; // 松弛疗愈
   isBudgetSaver: boolean; // 高性价比 / 省钱
   transportPreference: 'subway' | 'taxi' | 'walk' | 'auto' | 'bus'; // 出行工具偏好
+  deliveryRequests: string[]; // 新增：是否明确提到外卖/闪购需求（如：["奶茶", "鲜花"]），未提及则为空数组 []
   nodes: AIRecommendationNode[]; // 核心节点序列，按建议游玩顺序排列（支持任意多个目的地！）
 }
 
@@ -163,15 +164,23 @@ export async function parseNaturalLanguageQuery(
     }
 
     // 改为请求自建后端的 /api/chat 接口，隐藏真实 API Key
-    const apiUrl = import.meta.env.VITE_API_URL || '';
-    const targetUrl = `${apiUrl}/api/chat`;
+    const apiUrl = import.meta.env.VITE_API_URL;
+    
+    let targetUrl = `${apiUrl}/api/chat`;
+    let headers: any = {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream"
+    };
+
+    // 如果没配置后端地址（说明是在本地跑 npm run dev），则智能回退到前端直连模式，防止 404
+    if (!apiUrl) {
+      targetUrl = `${AI_CONFIG.baseURL}/chat/completions`;
+      headers["Authorization"] = `Bearer ${AI_CONFIG.apiKey}`;
+    }
 
     const response = await fetch(targetUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "text/event-stream"
-      },
+      headers: headers,
       signal: controller.signal,
       body: JSON.stringify({
         model: AI_CONFIG.model,
@@ -198,6 +207,7 @@ export async function parseNaturalLanguageQuery(
   "isChillRelax": 布尔值，是否偏松弛疗愈、慢生活、露营看海、温泉发呆,
   "isBudgetSaver": 布尔值，是否强调省钱、性价比、预算有限,
   "transportPreference": 字符串，"subway" | "taxi" | "walk" | "auto" | "bus" 中的一个，如果用户强指定了出行方式如“坐地铁”则为 subway，若指定“坐公交/乘公交/坐公交车”则为 bus，提到“打车”则为 taxi，提到“步行/散步”则为 walk，未强指定则为 auto,
+  "deliveryRequests": ["字符串数组", "如果用户在句子中明确提到要买杯咖啡、喝杯奶茶、订束鲜花、买点感冒药等外卖或闪购需求，请提取物品名称并放入此数组，例如 ['奶茶', '鲜花']。如果完全没提任何外卖/购物需求，必须返回空数组 []"],
   "nodes": [
     {
       "name": "真实好玩的景点、餐饮商户或酒店住宿名称。必须优先规划用户在心愿中指定的全部景点（例如用户同时指定了天坛、故宫、颐和园，必须在nodes序列中全部输出这三个景点，一个不能少！）。并在景点之间合适的位置智能插针规划就餐点（eat）。若天数大于1天，必须在第1至N-1天晚间的合适位置智能推荐插针一个高品质住宿点（hotel）",
@@ -297,6 +307,7 @@ export async function parseNaturalLanguageQuery(
 
     if (Array.isArray(parsedData.nodes) && parsedData.nodes.length > 0) {
       return {
+        deliveryRequests: parsedData.deliveryRequests || [],
         originalQuery: query,
         durationHours: parsedData.durationHours ?? 5,
         durationDays: parsedData.durationDays ?? (/(两日游|二日游|两天)/.test(lowercase) ? 2 : /(三日游|三天)/.test(lowercase) ? 3 : 1),

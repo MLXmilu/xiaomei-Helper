@@ -42,7 +42,7 @@
   }
 }
 
-/* 移动端精致的滚动条 */
+/* 移动端精致的全局滚动条 */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -54,6 +54,19 @@
 
 ::-webkit-scrollbar-thumb {
   @apply bg-darkbg-border rounded-full hover:bg-slate-300 transition-colors;
+}
+
+/* 侧边栏独立的主题滚动条 */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-slate-50/50 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-slate-200/80 rounded-full hover:bg-meituan transition-colors;
 }
 
 /* 温馨大圆角毛玻璃与卡片浮雕质感 (大厂商业级) */

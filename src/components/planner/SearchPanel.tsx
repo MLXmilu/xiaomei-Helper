@@ -1,10 +1,8 @@
 import { useState } from 'react';
-import { Send, Mic, MicOff, Loader2, Globe, Settings2, Users, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Send, Mic, MicOff, Loader2, Settings2, Users, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { usePlanning } from '../../context/PlanningContext';
-import { PRESETS } from '../../constants/presets';
 import {
   INPUT_PLACEHOLDER_AI,
-  INPUT_PLACEHOLDER_STANDARD,
 } from '../../constants/travelProfiles';
 import { ProfileInputGuide } from './ProfileInputGuide';
 
@@ -14,8 +12,8 @@ interface SearchPanelProps {
 
 export function SearchPanel({ compact = false }: SearchPanelProps) {
   const {
-    query, setQuery, useAi, setUseAi, isLoading, isListening,
-    isPlanFromAi, handlePlan, toggleListening,
+    query, setQuery, useAi, isLoading, isListening,
+    handlePlan, toggleListening,
   } = usePlanning();
 
   const pickExample = (text: string) => {
@@ -78,38 +76,14 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
         <div>
           <h2 className="text-lg font-extrabold text-slate-800">说说你的周末安排</h2>
           <p className="text-sm text-slate-500 mt-1">
-            {useAi
-              ? '联网模式下请尽量写清：谁一起、什么氛围、去哪、多久'
-              : '像跟朋友聊天一样描述即可；也可点下方场景快速填入'}
+            请尽量写清：谁一起、什么氛围、去哪、多久
           </p>
         </div>
       )}
 
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
-        <span className="text-xs font-bold text-slate-500">规划方式</span>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={() => { setUseAi(false); handlePlan(query, false); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-              !useAi ? 'bg-white shadow-sm text-slate-800 border border-slate-200' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            标准模式
-          </button>
-          <button
-            type="button"
-            onClick={() => { setUseAi(true); if (!isPlanFromAi) setQuery(''); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
-              useAi ? 'bg-white shadow-sm text-slate-800 border border-amber-200' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Globe className="w-3 h-3" /> 联网推荐
-          </button>
-        </div>
-      </div>
 
-      {useAi && !compact && (
+
+      {!compact && (
         <div className="flex flex-wrap items-center gap-2">
           {SCENARIOS.map(sc => (
             <button
@@ -140,7 +114,7 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
         </div>
       )}
 
-      {showAdvanced && useAi && !compact && (
+      {showAdvanced && !compact && (
         <div className="bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl p-4 space-y-4 animate-[fadeIn_0.2s_ease-out]">
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
@@ -185,14 +159,12 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
         </div>
       )}
 
-      <div className={`relative bg-white rounded-2xl border-2 flex items-end shadow-sm transition-all ${
-        useAi ? 'border-amber-200 focus-within:border-amber-300' : 'border-slate-200 focus-within:border-meituan/60'
-      }`}>
+      <div className={`relative bg-white rounded-2xl border-2 flex items-end shadow-sm transition-all border-amber-200 focus-within:border-amber-300`}>
         <textarea
-          rows={compact ? 2 : useAi ? 4 : 3}
+          rows={compact ? 2 : 4}
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder={useAi ? INPUT_PLACEHOLDER_AI : INPUT_PLACEHOLDER_STANDARD}
+          placeholder={INPUT_PLACEHOLDER_AI}
           className="flex-1 bg-transparent px-4 py-3 text-sm text-slate-800 placeholder-slate-400 border-0 focus:outline-none resize-none leading-relaxed"
         />
         <div className="flex items-center gap-1 p-2 shrink-0">
@@ -222,31 +194,9 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
         </div>
       </div>
 
-      {useAi && !compact && <ProfileInputGuide onPickExample={pickExample} />}
+      {!compact && <ProfileInputGuide onPickExample={pickExample} />}
 
-      {!useAi && (
-        <>
-          <p className="text-[11px] text-slate-400 px-1">
-            标准模式可点场景；若需识别「热血青春」等画像，建议切换联网推荐并参照上方填写要点
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {PRESETS.map((preset, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => { setQuery(preset.text); handlePlan(preset.text); }}
-                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border ${
-                  query === preset.text
-                    ? 'bg-amber-50 border-amber-300 text-amber-800'
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-amber-200 hover:bg-amber-50/50'
-                }`}
-              >
-                {preset.emoji} {preset.label}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+
     </div>
   );
 }

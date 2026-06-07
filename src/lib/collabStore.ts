@@ -24,7 +24,6 @@ export interface CollabFeedback {
 }
 
 const LS_PREFIX = 'meituan_collab_';
-const CHANNEL_PREFIX = 'collab_';
 
 /** 生成唯一 Session ID */
 export function generateSessionId(): string {
@@ -43,7 +42,20 @@ export function encodeConstraints(constraints: AppConstraints): string {
 /** 从 base64 字符串还原 AppConstraints */
 export function decodeConstraints(encoded: string): AppConstraints | null {
   try {
-    return JSON.parse(decodeURIComponent(atob(encoded)));
+    const parsed = JSON.parse(decodeURIComponent(atob(encoded)));
+    if (parsed.q !== undefined && parsed.n !== undefined) {
+      // 兼容极简模式
+      return {
+        originalQuery: parsed.q,
+        nodes: parsed.n.map((node: any) => ({
+          name: node.n,
+          type: node.t || 'play',
+          duration: 0,
+          price: 0
+        }))
+      } as AppConstraints;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -51,20 +63,19 @@ export function decodeConstraints(encoded: string): AppConstraints | null {
 
 /** 构建家人专属的协同链接 */
 export function buildCollabUrl(sessionId: string, constraints: AppConstraints): string {
-  // 极简提取协同页面展示所必需的字段，避免编码过长导致二维码 Data too long 报错
+  // 极简提取协同页面展示所必需的字段，使用极简的 key 并且截断长度，以防二维码过密扫不出来
   const lightweightConstraints = {
-    originalQuery: constraints.originalQuery,
-    nodes: constraints.nodes.slice(0, 6).map(n => ({
-      name: n.name,
-      type: n.type,
-      duration: n.duration,
-      price: n.price
+    q: constraints.originalQuery ? constraints.originalQuery.slice(0, 15) : '',
+    n: constraints.nodes.slice(0, 4).map(n => ({
+      n: n.name.slice(0, 10),
+      t: n.type
     }))
   };
   const encoded = encodeConstraints(lightweightConstraints as any);
-  // 使用真实的局域网 IP
-  const host = typeof __LOCAL_IP__ !== 'undefined' ? __LOCAL_IP__ : window.location.hostname;
-  const base = `http://${host}:${window.location.port || 5173}/collab`;
+  // 使用真实的局域网 IP（开发模式）或公网 URL（生产模式）
+  const base = import.meta.env.PROD
+    ? `${window.location.origin}/collab`
+    : `http://${typeof __LOCAL_IP__ !== 'undefined' ? __LOCAL_IP__ : window.location.hostname}:${window.location.port || 5173}/collab`;
   return `${base}#s=${sessionId}&d=${encoded}`;
 }
 

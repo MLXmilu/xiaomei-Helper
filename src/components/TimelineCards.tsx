@@ -5,6 +5,8 @@ import {
   Train, Car, Footprints, Bus, Plane
 } from 'lucide-react';
 import type { TimelineItem } from '../agentEngine';
+import { usePlanning } from '../context/PlanningContext';
+import { Gift } from 'lucide-react';
 
 interface SubwayRoutePanelProps {
   startPos: [number, number];
@@ -388,6 +390,7 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
   isExecuting,
   targetCity
 }) => {
+  const { constraints, setShowCashierModal } = usePlanning();
   if (timeline.length === 0) return null;
 
   const getStatusBadge = (status: TimelineItem['actionStatus']) => {
@@ -662,6 +665,39 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
           </React.Fragment>
         );
       })}
+
+      {/* 外卖闪购按需触发卡片 */}
+      {constraints?.deliveryRequests && constraints.deliveryRequests.length > 0 && (
+        <div className="mt-8 mb-4 border border-meituan/40 bg-gradient-to-r from-amber-50 to-orange-50 rounded-3xl p-5 shadow-[0_4px_20px_rgba(255,209,0,0.15)] relative overflow-hidden animate-[slideUp_0.5s_ease-out]">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-meituan/20 rounded-full blur-2xl"></div>
+          
+          <div className="flex items-start gap-4 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0">
+              <Gift className="w-6 h-6 text-amber-500 animate-bounce" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-white bg-amber-500 px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">AI 专属发现</span>
+              </div>
+              <h3 className="text-sm font-extrabold text-slate-800 mt-1.5 leading-snug">
+                管家捕捉到了您的额外需求：
+                <span className="text-amber-600 ml-1">{constraints.deliveryRequests.join('、')}</span>
+              </h3>
+              <p className="text-xs text-slate-500 mt-1 mb-3">
+                为了不打断您的主行程，我已为您准备了附近优质商家的高德实时搜寻通道。
+              </p>
+              
+              <button
+                onClick={() => setShowCashierModal(true)}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 active:scale-95 text-white text-xs font-black transition-all shadow-md flex items-center justify-center gap-2"
+              >
+                马上为我搜寻附近商家
+                <span className="text-amber-400">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -74,12 +74,21 @@ export function CollabModal() {
       });
     });
 
-    // 轮询（跨设备 fallback）
+    // 轮询（主要作为跨标签页 fallback），改为合并而不是覆盖
     pollRef.current = setInterval(() => {
       const latest = readFeedbacks(collabSessionId);
+      if (!latest || latest.length === 0) return;
+      
       setFeedbacks((prev) => {
-        if (latest.length !== prev.length) return latest;
-        return prev;
+        let changed = false;
+        const merged = [...prev];
+        latest.forEach(fb => {
+          if (!merged.some(f => f.id === fb.id)) {
+            merged.push(fb);
+            changed = true;
+          }
+        });
+        return changed ? merged : prev;
       });
     }, 2000);
 
@@ -92,11 +101,23 @@ export function CollabModal() {
   const handleCopyLink = useCallback(async () => {
     if (!collabUrl) return;
     try {
-      await navigator.clipboard.writeText(collabUrl);
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(collabUrl);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = collabUrl;
+        textArea.style.position = "fixed";
+        textArea.style.opacity = "0";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
-      prompt('复制以下链接：', collabUrl);
+      prompt('自动复制失败，请手动复制以下链接：', collabUrl);
     }
   }, [collabUrl]);
 
@@ -123,9 +144,9 @@ export function CollabModal() {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4 animate-[fadeIn_0.2s_ease-out]">
-      <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden">
+      <div className="relative bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         {/* 顶部渐变标题栏 */}
-        <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-7 py-5 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 px-7 py-5 flex items-center justify-between shrink-0">
           <div>
             <p className="text-[10px] font-black text-amber-900/70 uppercase tracking-widest">Multi-user Collaborative</p>
             <h2 className="text-lg font-black text-white mt-0.5 flex items-center gap-2">
@@ -141,7 +162,7 @@ export function CollabModal() {
           </button>
         </div>
 
-        <div className="p-6 grid sm:grid-cols-[1fr_auto] gap-6">
+        <div className="p-6 grid sm:grid-cols-[1fr_auto] gap-6 overflow-y-auto min-h-0">
           {/* 左：功能区域 */}
           <div className="space-y-5 min-w-0">
             {/* 链接复制 */}
