@@ -1,73 +1,94 @@
-# React + TypeScript + Vite
+# 小美管家 (XiaoMei Helper)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**代码仓库**：[https://github.com/MLXmilu/xiaomei-Helper](https://github.com/MLXmilu/xiaomei-Helper)
 
-Currently, two official plugins are available:
+「小美管家」是一款基于大语言模型（LLM）构建的新一代 Web UI 智能出行交互系统。项目旨在颠覆传统的繁琐机酒预订体验，用户只需用一句自然语言描述周末心愿（如“带娃和减脂老婆去避开人群的地方”），Agent「管家小美」即可精准捕捉多维画像，自动完成“玩 + 吃 + 闪购 + 交通”的极致全链路闭环编排。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**技术栈**：React + TypeScript + Vite + 高德地图 API + 小米 MiMo 大模型。
 
-## React Compiler
+## 🌟 核心亮点 (Core Highlights)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. **🤖 全流式 AI 智慧推荐**：告别死板的本地数据库检索。管家小美不仅能实时流式输出推理过程，精准抓取 8 类出行画像（带娃、减脂等），更能智能插针式安排就餐与住宿。连点击“换一换”时，都会**完全接入大模型实时演算**，根据上下文现场为您构思绝佳替代方案。
+2. **🤝 创新级多人意图协同**：打破传统“一人干活，全家挑刺”的局限。家人或朋友只需扫码，即可在移动端轻松追加个人偏好（如：想看展、要晚起、需要订花等）。系统接收到协同意图后，会在**原方案基础上平滑重构**，完美化解众口难调的痛点。
+3. **⚡ 毫秒级自适应 Re-Planning**：在模拟全包下单时，若遇到餐厅爆满排队时间过长，管家小美将在 **1.2 秒内**极速触发底层重算引擎，自动平替空闲餐厅、重算高德真实交通流、重新改派外卖闪购地址，**用户全程无感知，容灾体验拉满**。
+4. **🛍️ 跨业务全链路闭环**：一站式融合美团/大众点评的生态能力，将门票、餐饮折扣、买药/鲜花闪购、尾房特惠与跨城交通无缝编排成一张总账单，直观展示“小美已为您省下多少钱”。
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🧠 三层大脑架构 (Planning Strategy)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+整个系统依托于 `agentEngine.ts` 构建，由 `PlanningContext` 负责全局上下文统一编排：
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Layer 1 · 意图解析 (parseNaturalLanguageQuery)
+*   **深层语义穿透**：调用 MiMo 大模型（SSE 流式），将一句简单的自然语言裂变为包含出行时长、城市、活动半径、8 大画像、交通偏好、隐藏外卖需求（如感冒药、买花）在内的 `AppConstraints` 结构化约束。
+*   **透明化 AI 思考**：LLM 的推理过程及大模型与本地正则双通道融合的过程，会以管家气泡的形式实时流式展示，拉近人机距离。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### Layer 2 · 智慧路线编排 (generateSmartPlan)
+*   **全链路智能串联**：基于结构化约束生成 `ActivityPlan`。不仅按时间轴有序排列所有商户，更内置决策树智能切换交通方式（跨城大交通 → 步行 → 公交 → 地铁 → 高德网约车），聚合多业务总收银台。
+*   **动态交互引擎**：支持极其自由的行程微调。卡片支持**自由上下拖拽上移下移**；不仅如此，“换一换”更是实时唤醒 AI 根据环境生成“情境一致”的新鲜平替节点。
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Layer 3 · 事务流水线 (executePlanTools)
+*   **高仿真闭环系统**：固定 4 步流水线（检索周边 → 订门票 → 派闪购 → 校验排队）模拟全链路一键下单。
+*   **状态同步驱动**：每一步的异步推进，均会驱动时间轴卡片状态机（Idle -> Executing -> Success/Failed）与管家动作标签完美同步刷新。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🛠️ 双引擎协同与底层工具机制
+
+### 🧑‍🤝‍🧑 多人意图协同引擎 (Co-Pilot Planning)
+针对结伴出行的痛点，构建了高保真家庭/朋友圈协作闭环：
+*   **意见多端聚合**：同行人可通过 CollabModal 协同端加入房间，并追加个性化标签（如：预算有限、低热量餐饮）。
+*   **无缝增量融合**：主控端收到新标签后，将其打包为增量 Prompt（“同行人新加了需求...”）交由 AI 进行二次推演，确保新的行程在不推翻主体框架的情况下满足全员需求。
+
+### 工具调用模拟链路
+工具集以 `ThoughtLog` 旁白 + `actionStatus` 的形式内嵌于引擎中：
+
+| 核心组件 | 核心作用描述 |
+| :--- | :--- |
+| `generateAlternativeNode()` | **AI智慧推荐专法**：局部重建专用接口，大模型实时流式推理，寻找逻辑自洽的最优平替商户。 |
+| `buyTickets()` / `dispatchDelivery()` | 分发执行：预订门票生成电子码，根据画像智能派发同城零售闪购（如感冒买药）。 |
+| `checkRealtimeStatus()` | 探针拦截：校验餐厅实时拥挤度，排队超限直接触发高优阻断中断机制。 |
+| `rePlanRoute()` | 异常恢复：光速平替餐厅，重绘路线连线，并刷新时间轴财务/交通账单。 |
+
+**Mock 支撑体系**：`mockData.ts` 提供丰富且带有动态排队参数的商圈 POI；`vite.config.ts` 内置跨域与状态协同支持。
+
+---
+
+## 🛡️ 极客级异常处理 (Robustness)
+
+**核心原则：AI 失败不静默降级；用户中止不报错；业务阻塞极速容灾。**
+
+1.  **AI 容错与阻断层**：大模型若遇超时（60s）或网络抽风，系统会优雅提示；当用户在流式输出中途点击「停止思考」，AbortController 会瞬间掐断网络链路，界面无缝退回至安全状态，无脏数据残留。
+2.  **极致容灾重构 (Re-Planning)**：当执行引擎探针检测到严重拥堵（例如：命中某火锅店等位 48 桌，或全局开启“模拟下单失败”开关），Agent 会在 **约 1.2 秒** 内打出一套连招：
+    *   **标记失效**：立刻终止原路线的资源锁定。
+    *   **降维平替**：启动备用算法从 POI 池瞬间揪出高质量平替商户。
+    *   **重算路网**：利用 Haversine 公式重算真实距离与交通耗时。
+    *   **外卖改派**：将已在路上的小美闪购骑手目标地址平滑切换至新餐厅。
+3.  **视觉兜底**：无论前端请求高德 API 是否偶发限流受阻，我们都提供了一套自研的高逼格【彩色串线地铁换乘时间轴】组件进行 UI 兜底展示，绝不影响全流程演示的极客观感。
+
+---
+
+## 🚀 快速启动 (Getting Started)
+
+1. **环境准备**:
+   确保您的机器上安装了 Node.js (v16 或更高版本) 和 npm。
+
+2. **安装依赖**:
+   ```bash
+   npm install
+   ```
+
+3. **配置环境变量**:
+   创建 `.env` 文件并填入您的 API Keys (如 MiMo 模型 API Key 与高德地图 Web端 Key)。
+
+4. **本地开发运行**:
+   ```bash
+   npm run dev
+   ```
+
+5. **构建生产版本**:
+   ```bash
+   npm run build
+   ```
+
+本项目不仅是一个智能助手，更是探索下一代 Agent 商业化落地的极客化先锋实践。欢迎体验！
