@@ -17,7 +17,7 @@ export function Footer() {
               <div className="w-9 h-9 rounded-xl bg-[#FFD100] flex items-center justify-center">
                 <Heart className="w-4 h-4 text-slate-900 fill-slate-900" />
               </div>
-              <span className="font-extrabold text-slate-900 text-[15px]">美团周末管家</span>
+              <span className="font-extrabold text-slate-900 text-[15px]">小美周末管家</span>
             </div>
             <p className="text-sm text-slate-500 leading-relaxed max-w-sm">
               本地短时出行规划与一键执行。从说出安排到路线规划、下单，让每次周末陪伴更省心。
@@ -60,7 +60,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-[#efece6]">
-          <p className="text-xs text-slate-400">© 2026 美团周末管家 · 概念演示</p>
+          <p className="text-xs text-slate-400">© 2026 小美周末管家 · 概念演示</p>
         </div>
       </div>
     </footer>

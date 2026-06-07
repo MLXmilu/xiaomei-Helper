@@ -20,6 +20,12 @@ export interface CollabFeedback {
   limitedStamina?: boolean;
   lightNutritious?: boolean;
   medicineEmergency?: boolean;
+  photoSpot?: boolean; // 拍照出片
+  budgetLimit?: boolean; // 预算有限
+  petFriendly?: boolean; // 宠物友好
+  avoidCrowd?: boolean; // 避开人流
+  localSnack?: boolean; // 特色小吃
+  needCoffee?: boolean; // 咖啡续命
   customText?: string;
 }
 
@@ -136,8 +142,14 @@ export function subscribeFeedbackChannel(
       const res = await fetch(`${apiUrl}/api/feedback/${sessionId}`);
       if (res.ok) {
         const data: CollabFeedback[] = await res.json();
-        data.forEach(fb => {
-          if (!seenIds.has(fb.id)) {
+        data.forEach(rawFb => {
+          let fb: CollabFeedback;
+          try {
+            fb = typeof rawFb === 'string' ? JSON.parse(rawFb) : rawFb;
+          } catch {
+            return;
+          }
+          if (fb && !seenIds.has(fb.id)) {
             seenIds.add(fb.id);
             onFeedback(fb);
           }

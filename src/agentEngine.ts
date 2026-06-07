@@ -34,14 +34,14 @@ export interface AppConstraints {
   nodes: AIRecommendationNode[]; // 核心节点序列，按建议游玩顺序排列（支持任意多个目的地！）
 }
 
-// 门票、餐饮、闪购、酒店、打车、地铁的美团超级全包大账单明细
+// 门票、餐饮、闪购、酒店、打车、地铁的小美超级全包大账单明细
 export interface MeituanBusinessBill {
   ticketPrice?: { original: number; current: number; label: string }; // 门票
   mealPrice?: { original: number; current: number; couponDeducted: number; label: string }; // 餐饮套餐
   retailPrice?: { cost: number; deliveryFee: number; label: string }; // 闪购药品/烘焙
   hotelPrice?: { original: number; current: number; label: string }; // 尾房闪惠
   taxiPrice?: { estimated: number; label: string }; // 运力打车费
-  subwayPrice?: { cost: number; label: string }; // 新增：美团交通地铁票预存款
+  subwayPrice?: { cost: number; label: string }; // 新增：小美交通地铁票预存款
   savingsTotal: number; // 累计已为您省去
   grandTotal: number; // 打包实付总计
 }
@@ -71,7 +71,7 @@ export interface ActivityPlan {
   childFriendlyScore: number;
   friendsVibeScore: number;
   summaryText: string;
-  businessBill: MeituanBusinessBill; // 美团打包总收银台账单
+  businessBill: MeituanBusinessBill; // 小美打包总收银台账单
   targetCity?: string;
   durationDays?: number;
 }
@@ -352,7 +352,109 @@ export async function parseNaturalLanguageQuery(
     throw new Error(`AI出行规划服务暂时不可用：${err.message || '网络连接异常'}`);
   }
 }
-// 2. 多目标路线规划器 (包含美团多业务价格计算)
+
+export async function generateAlternativeNode(
+  nodeToReplace: AIRecommendationNode,
+  constraints: AppConstraints,
+  onStreamChunk?: (text: string) => void
+): Promise<AIRecommendationNode> {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  let targetUrl = `${apiUrl}/api/chat`;
+  let headers: any = {
+    "Content-Type": "application/json",
+    "Accept": "text/event-stream"
+  };
+
+  if (!apiUrl) {
+    targetUrl = `${AI_CONFIG.baseURL}/chat/completions`;
+    headers["Authorization"] = `Bearer ${AI_CONFIG.apiKey}`;
+  }
+
+  const response = await fetch(targetUrl, {
+    method: "POST",
+    headers: headers,
+    body: JSON.stringify({
+      model: AI_CONFIG.model,
+      temperature: 0.7,
+      stream: true,
+      messages: [
+        {
+          role: "system",
+          content: `你是一个智能出行管家。用户希望替换当前行程中的一个节点。请根据用户的整体行程和要求，提供一个不同的、相似的、但能完美平替的地点。
+必须严格以简洁的 JSON 格式输出，不要包含 markdown 代码块。
+JSON 结构必须为：
+{
+  "name": "商户/景点名称",
+  "description": "推荐语",
+  "price": 价格数字,
+  "duration": 停留分钟数,
+  "tags": ["标签1", "标签2"],
+  "position": [经度, 纬度],
+  "type": "${nodeToReplace.type}",
+  "day": ${nodeToReplace.day || 1}
+}`
+        },
+        {
+          role: "user",
+          content: `当前行程上下文：
+- 用户原意：${constraints.originalQuery}
+- 城市：${constraints.targetCity}
+- 需要替换掉的节点是：${nodeToReplace.name} (类型：${nodeToReplace.type})。
+请给我一个符合原意上下文的全新平替节点！`
+        }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Fetch error: ${response.statusText}`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("Response body is not readable");
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  let completeText = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "data: [DONE]") continue;
+      if (trimmed.startsWith("data: ")) {
+        try {
+          const dataJson = JSON.parse(trimmed.slice(6));
+          const choice = dataJson.choices?.[0];
+          const contentChunk = choice?.delta?.content || choice?.text || "";
+          if (contentChunk) {
+            completeText += contentChunk;
+            if (onStreamChunk) {
+              onStreamChunk(completeText);
+            }
+          }
+        } catch (e) {
+          console.warn("Parse error", e);
+        }
+      }
+    }
+  }
+
+  const jsonString = extractPureJSON(completeText);
+  const parsedData = JSON.parse(jsonString);
+  return {
+    ...parsedData,
+    position: Array.isArray(parsedData.position) && parsedData.position.length === 2 ? [Number(parsedData.position[0]), Number(parsedData.position[1])] : nodeToReplace.position,
+    type: nodeToReplace.type,
+    day: nodeToReplace.day || 1,
+    price: Number(parsedData.price) || nodeToReplace.price,
+    duration: Number(parsedData.duration) || nodeToReplace.duration
+  };
+}
+// 2. 多目标路线规划器 (包含小美多业务价格计算)
 // ==========================================
 export function generateSmartPlan(
   constraints: AppConstraints,
@@ -573,7 +675,7 @@ export function generateSmartPlan(
       travelTime = Math.max(5, Math.round((dist / 18) * 60 + 4));
       cost = Math.max(14, Math.round(dist * 2.4 + 4)) * personCount;
       taxiCost += cost;
-      details = `🚗 呼叫美团打车 (高德路网预估里程 ${dist}公里，约 ${travelTime}分钟，预估 ¥${cost})`;
+      details = `🚗 呼叫小美打车 (高德路网预估里程 ${dist}公里，约 ${travelTime}分钟，预估 ¥${cost})`;
     }
 
     // 记录上一节点的到下节点交通
@@ -628,19 +730,19 @@ export function generateSmartPlan(
       actionLabel = '自动预订餐厅靠窗座';
       
       mealOriginal += nodeData.price * personCount;
-      mealCurrent += Math.round(nodeData.price * 0.9 * personCount); // 美团团购餐饮 9 折
+      mealCurrent += Math.round(nodeData.price * 0.9 * personCount); // 小美团购餐饮 9 折
       mealCoupon += (nodeData.price * personCount) - Math.round(nodeData.price * 0.9 * personCount);
     } else if (nodeData.type === 'hotel') {
-      actionLabel = '预订美团限时尾房特惠';
+      actionLabel = '预订小美限时尾房特惠';
       hotelNode = nodeData;
       
       hotelOriginal += nodeData.price;
-      hotelCurrent += Math.round(nodeData.price * 0.7 * personCount); // 美团日落尾房 7 折
+      hotelCurrent += Math.round(nodeData.price * 0.7 * personCount); // 小美日落尾房 7 折
     } else {
       actionLabel = '在线扫码购票入园';
       
       ticketOriginal += nodeData.price * personCount;
-      ticketCurrent += Math.round(nodeData.price * 0.85 * personCount); // 美团特惠门票 8.5 折
+      ticketCurrent += Math.round(nodeData.price * 0.85 * personCount); // 小美特惠门票 8.5 折
       ticketCount += personCount;
     }
 
@@ -659,7 +761,7 @@ export function generateSmartPlan(
   }
 
   // 5. 闪购协同插针
-  // 如果是高中生经典长跑行程，自动在餐饮点配送一盒“三九感冒灵/润喉糖”至餐厅前台，体现美团闪购的跨业务极速配送！
+  // 如果是高中生经典长跑行程，自动在餐饮点配送一盒“三九感冒灵/润喉糖”至餐厅前台，体现小美闪购的跨业务极速配送！
   const lastEatNodeIdx = timeline.findIndex(t => t.node.type === 'eat');
   if (lastEatNodeIdx !== -1) {
     retailCost = 15; // 一盒感冒灵 15 元
@@ -682,7 +784,7 @@ export function generateSmartPlan(
     businessBill.ticketPrice = {
       original: ticketOriginal,
       current: ticketCurrent,
-      label: `美团专享景点门票特惠`
+      label: `小美专享景点门票特惠`
     };
   }
   if (mealOriginal > 0) {
@@ -690,14 +792,14 @@ export function generateSmartPlan(
       original: mealOriginal,
       current: mealCurrent,
       couponDeducted: mealCoupon,
-      label: `美团买单专享折扣`
+      label: `小美买单专享折扣`
     };
   }
   if (retailCost > 0) {
     businessBill.retailPrice = {
       cost: retailCost,
       deliveryFee: 0,
-      label: `闪购美团买药 (免¥5跑腿费)`
+      label: `闪购小美买药 (免¥5跑腿费)`
     };
   }
   if (hotelNode && hotelOriginal > 0) {
@@ -710,7 +812,7 @@ export function generateSmartPlan(
   if (taxiCost > 0) {
     businessBill.taxiPrice = {
       estimated: taxiCost,
-      label: `美团打车 (高德路网计价)`
+      label: `小美打车 (高德路网计价)`
     };
   }
   if (subwayCost > 0) {
@@ -814,7 +916,7 @@ export async function executePlanTools(
 
   // --- Step 3: 执行闪购跑腿配送 ---
   const matchedRetail = matchBestRetailNode(constraints);
-  addLog('action', `美团闪购协同 ── 正在调用 dispatchDelivery() 派单 [${matchedRetail.name}]，拟送达 [${currentTimeline[2].node.name}]...`);
+  addLog('action', `小美闪购协同 ── 正在调用 dispatchDelivery() 派单 [${matchedRetail.name}]，拟送达 [${currentTimeline[2].node.name}]...`);
   await delay(1000);
   addLog('success', `闪购订单支付成功，配送骑手 [李小兵] 已接单，配送中。`);
   await delay(600);
@@ -902,11 +1004,11 @@ export function generateShareText(plan: ActivityPlan): string {
     shareText += `2. 美食大餐：去吃 [${eatNames}]，我查了不需要现场排长队，座位/特惠已锁定！\n`;
   }
   if (plan.businessBill.retailPrice) {
-    shareText += `3. 即时买药/闪送：我还通过美团买药提前给咱送了润喉糖/阻断片，直接寄到餐厅～\n`;
+    shareText += `3. 即时买药/闪送：我还通过小美买药提前给咱送了润喉糖/阻断片，直接寄到餐厅～\n`;
   }
   if (hotelItem) {
-    shareText += `4. 温馨落脚点：晚上我们顺便住在附近的 [${hotelItem.node.name}]，已享受美团傍晚日落尾房超低闪惠价！\n`;
+    shareText += `4. 温馨落脚点：晚上我们顺便住在附近的 [${hotelItem.node.name}]，已享受小美傍晚日落尾房超低闪惠价！\n`;
   }
-  shareText += `\n大账单已帮我们合并美团特惠，累计打包省下 ￥${plan.businessBill.savingsTotal}！搞定了，我们出发！`;
+  shareText += `\n大账单已帮我们合并小美特惠，累计打包省下 ￥${plan.businessBill.savingsTotal}！搞定了，我们出发！`;
   return shareText;
 }

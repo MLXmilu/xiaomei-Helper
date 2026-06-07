@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Heart, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
 const NAV_ITEMS = [
   { to: '/', label: '首页' },
@@ -19,12 +19,12 @@ export function Navbar() {
       <div className="page-container">
         <div className="flex items-center justify-between h-[4.25rem] gap-4">
           <NavLink to="/" className="flex items-center gap-3 shrink-0 group">
-            <div className="w-10 h-10 rounded-xl bg-[#FFD100] flex items-center justify-center shadow-sm group-hover:shadow-md transition-shadow">
-              <Heart className="w-5 h-5 text-slate-900 fill-slate-900" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm group-hover:shadow-md transition-shadow">
+              <img src="/meituan-logo.png" alt="小美周末管家" className="w-full h-full object-cover" />
             </div>
             <div>
               <h1 className="text-[15px] font-extrabold text-slate-900 tracking-tight leading-tight">
-                美团周末管家
+                小美周末管家
               </h1>
               <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
                 周末出行 · 规划与下单

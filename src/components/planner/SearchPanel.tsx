@@ -27,13 +27,13 @@ export function SearchPanel({ compact = false }: SearchPanelProps) {
   const [styles, setStyles] = useState<string[]>([]);
 
   const SCENARIOS = [
-    { id: 'family', label: '👨‍👩‍👦 家庭周末', config: { companions: '带娃(5岁)', styles: ['特色美食', '松弛疗愈'] } },
-    { id: 'friends', label: '🍻 朋友聚会', config: { companions: '三五好友(4人)', styles: ['刺激嗨玩', '特色美食'] } },
+    { id: 'family', label: '👨‍👩‍👦 家庭周末', config: { companions: '带娃', styles: ['特色美食', '松弛疗愈', '亲子互动'] } },
+    { id: 'friends', label: '🍻 朋友聚会', config: { companions: '三五好友', styles: ['刺激嗨玩', '特色美食', '免门票'] } },
     { id: 'solo', label: '🏃 单人放松', config: { companions: '独自一人', styles: ['松弛疗愈', '潮流看展'] } }
   ];
 
-  const COMPANIONS_OPTS = ['独自一人', '情侣双人', '带娃(5岁)', '带长辈', '三五好友(4人)'];
-  const STYLES_OPTS = ['特色美食', '松弛疗愈', '刺激嗨玩', '潮流看展', '特种兵打卡', '高性价比'];
+  const COMPANIONS_OPTS = ['独自一人', '情侣双人', '带娃', '带长辈', '三五好友', '家庭聚餐', '团建出行'];
+  const STYLES_OPTS = ['特色美食', '松弛疗愈', '刺激嗨玩', '潮流看展', '特种兵打卡', '高性价比', '亲子互动', '历史文化', '自然风光', '免门票', '宠物友好'];
 
   const handleSelectScenario = (sc: typeof SCENARIOS[0]) => {
     if (activeScenario === sc.id) {

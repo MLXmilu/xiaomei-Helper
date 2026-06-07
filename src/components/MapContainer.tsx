@@ -35,7 +35,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
     return [sumLng / positions.length, sumLat / positions.length];
   };
 
-  // 零售点坐标 (美团闪送/买药)
+  // 零售点坐标 (小美闪送/买药)
   const retailItem = timeline.find(item => item.node.type === 'retail');
   // 如果没有明确坐标，则在第二个常规节点附近偏移动态插针
   const firstDestPos = activeItems[1]?.node?.position || [116.4108, 39.8725];
@@ -136,7 +136,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
           markersRef.current.push(marker);
         });
 
-        // B. 动态绘制美团闪送骑手 (仅在购买时)
+        // B. 动态绘制小美闪送骑手 (仅在购买时)
         if (isExecuting) {
           const riderMarker = new window.AMap.Marker({
             position: retailPos,
@@ -146,7 +146,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
                 <div class="w-7 h-7 rounded-full bg-meituan border border-meituan-dark shadow-md flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2D2D2D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
                 </div>
-                <span class="px-1 py-0.2 rounded bg-meituan border border-meituan-dark text-[7px] font-bold text-slate-800 mt-0.5 whitespace-nowrap">美团骑手</span>
+                <span class="px-1 py-0.2 rounded bg-meituan border border-meituan-dark text-[7px] font-bold text-slate-800 mt-0.5 whitespace-nowrap">小美骑手</span>
               </div>
             `
           });
@@ -485,7 +485,7 @@ export const MapContainer: React.FC<MapContainerProps> = ({ timeline, isExecutin
         </div>
 
         <div className="w-full text-center text-[7.5px] font-semibold text-slate-400 pb-0.5 tracking-wide">
-          <span>AMap 接口加载中... 离线状态下将无缝降级为美团数字商圈孪生</span>
+          <span>AMap 接口加载中... 离线状态下将无缝降级为小美数字商圈孪生</span>
         </div>
       </div>
 

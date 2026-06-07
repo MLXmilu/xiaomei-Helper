@@ -1,12 +1,10 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, Clock, RefreshCw, Sparkles } from 'lucide-react';
-import { PRESETS, FEATURES } from '../constants/presets';
+import { ArrowRight, Clock, Sparkles } from 'lucide-react';
+import { FEATURES } from '../constants/presets';
 import { HOME_COPY } from '../constants/copy';
 import { usePlanning } from '../context/PlanningContext';
 
-/** ?? Hero ???????? public/images/hero-weekend.png */
-const HERO_BG = '/images/hero-weekend.png';
+import HERO_BG from '../assets/hero-weekend.png';
 
 function formatLastEdited(id: number) {
   const d = new Date(id);
@@ -23,21 +21,9 @@ export function HomePage() {
   const { historyList } = usePlanning();
   const c = HOME_COPY;
   const latest = historyList.find(item => item.isAi === true);
-  const [presetOffset, setPresetOffset] = useState(0);
 
-  const visiblePresets = [
-    PRESETS[presetOffset % PRESETS.length],
-    PRESETS[(presetOffset + 1) % PRESETS.length],
-    PRESETS[(presetOffset + 2) % PRESETS.length],
-  ];
-
-  const goPlan = (query?: string) => {
-    navigate('/planner', query ? { state: { query } } : undefined);
-  };
-
-  const handleRandomInspiration = () => {
-    const preset = PRESETS[Math.floor(Math.random() * PRESETS.length)];
-    goPlan(preset.text);
+  const goPlan = (query?: string, instantLoad?: boolean) => {
+    navigate('/planner', query ? { state: { query, instantLoad } } : undefined);
   };
 
   return (
@@ -76,40 +62,6 @@ export function HomePage() {
                   {c.ctaPrimary}
                   <ArrowRight className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
-                <button
-                  type="button"
-                  onClick={handleRandomInspiration}
-                  className="inline-flex items-center gap-1.5 px-6 py-4 rounded-full bg-white border border-slate-200 text-slate-700 font-semibold text-base hover:border-slate-300 hover:bg-slate-50 transition-all"
-                >
-                  {c.ctaRandom}
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                </button>
-              </div>
-
-              <div className="pt-2">
-                <p className="text-base text-slate-500 mb-3">{c.quickStartLabel}</p>
-                <div className="flex flex-wrap gap-2.5">
-                  {visiblePresets.map(preset => (
-                    <button
-                      key={preset.label}
-                      type="button"
-                      onClick={() => goPlan(preset.text)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-white border border-slate-200/90 text-base font-medium text-slate-700 hover:border-amber-200 hover:bg-amber-50/50 transition-all shadow-sm"
-                    >
-                      <span>{preset.emoji}</span>
-                      {preset.label}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => setPresetOffset(o => o + 1)}
-                    className="inline-flex items-center gap-1 px-3 py-2.5 rounded-full text-base font-medium text-slate-500 hover:text-slate-800 hover:bg-white border border-transparent hover:border-slate-200 transition-all"
-                    title={c.moreScenes}
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    {c.moreScenes}
-                  </button>
-                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-x-1 gap-y-2 pt-4 text-sm sm:text-base text-slate-500">
@@ -168,7 +120,7 @@ export function HomePage() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => goPlan(c.preview.quote.replace(/^"|"$/g, ''))}
+                      onClick={() => goPlan(c.preview.quote.replace(/^"|"$/g, ''), true)}
                       className="inline-flex items-center gap-1 px-5 py-3 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors shrink-0"
                     >
                       {c.preview.viewPlan}

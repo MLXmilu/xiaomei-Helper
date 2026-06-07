@@ -1,21 +1,25 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="https://www.meituan.com/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="美团周末管家 — 帮你规划周末吃喝玩乐路线，支持订座购票、闪购配送与一键下单。" />
-    <title>美团周末管家 - 周末出行规划与下单</title>
-    <!-- 高德地图 API 安全密钥与 SDK 动态注入 -->
-    <script type="text/javascript">
-      window._AMapSecurityConfig = {
-        securityJsCode: "bfe5f17b2c531aae96e3c76b44639d04",
-      };
-    </script>
-    <script type="text/javascript" src="https://webapi.amap.com/maps?v=2.0&key=7a419b1e8b98457206ae3b72ed4fcb31&plugin=AMap.Driving,AMap.Riding,AMap.Walking,AMap.PlaceSearch"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="/meituan-logo.png" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="小美周末管家 — 帮你规划周末吃喝玩乐路线，支持订座购票、闪购配送与一键下单。" />
+  <title>小美周末管家 - 周末出行规划与下单</title>
+  <!-- 高德地图 API 安全密钥与 SDK 动态注入 -->
+  <script type="text/javascript">
+    window._AMapSecurityConfig = {
+      securityJsCode: "bfe5f17b2c531aae96e3c76b44639d04",
+    };
+  </script>
+  <script type="text/javascript"
+    src="https://webapi.amap.com/maps?v=2.0&key=7a419b1e8b98457206ae3b72ed4fcb31&plugin=AMap.Driving,AMap.Riding,AMap.Walking,AMap.PlaceSearch"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

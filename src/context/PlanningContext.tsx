@@ -4,12 +4,12 @@ import {
   parseNaturalLanguageQuery,
   generateSmartPlan,
   executePlanTools,
+  generateAlternativeNode,
   type AppConstraints,
   type ActivityPlan,
   type ThoughtLog,
 } from '../agentEngine';
 import { MOCK_LOCATIONS } from '../mockData';
-import { formatProfileSummary } from '../constants/travelProfiles';
 
 export interface HistoryItem {
   id: number;
@@ -58,9 +58,9 @@ interface PlanningContextValue {
   openCollabModal: () => void;
   collabSessionId: string | null;
   handleCollabSubmit: (options: any) => void;
-  handlePlan: (targetQuery: string, forceAiOption?: boolean) => Promise<void>;
+  handlePlan: (targetQuery: string, forceAiOption?: boolean, instantLoad?: boolean) => Promise<void>;
   handlePlanPreset: (presetText: string) => Promise<void>;
-  handleSwapOrder: () => void;
+  handleMoveNode: (nodeId: string, direction: 'up' | 'down') => void;
   handleShuffleNode: (nodeId: string, type: 'play' | 'eat') => void;
   handleRestoreHistory: (item: HistoryItem) => void;
   handleClearHistory: () => void;
@@ -160,7 +160,7 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setConfetti([]), 4500);
   };
 
-  const handlePlan = useCallback(async (targetQuery: string, forceAiOption?: boolean) => {
+  const handlePlan = useCallback(async (targetQuery: string, forceAiOption?: boolean, instantLoad?: boolean) => {
     if (!targetQuery.trim()) return;
     if (abortControllerRef.current) abortControllerRef.current.abort();
     const controller = new AbortController();
@@ -170,26 +170,73 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
     setIsExecuting(false);
     const activeAi = forceAiOption !== undefined ? forceAiOption : useAi;
 
-    if (activeAi) {
-      setLogs([
-        { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 小美收到啦："${targetQuery}"` },
-        { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `正在联网帮你挑合适的店和路线…` },
-      ]);
-    } else {
-      setLogs([
-        { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 小美收到啦："${targetQuery}"` },
-        { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `正在按附近热门路线帮你匹配…` },
-      ]);
+    if (!instantLoad) {
+      if (activeAi) {
+        setLogs([
+          { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 小美收到啦："${targetQuery}"` },
+          { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `正在联网帮你挑合适的店和路线…` },
+        ]);
+      } else {
+        setLogs([
+          { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 小美收到啦："${targetQuery}"` },
+          { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `正在按附近热门路线帮你匹配…` },
+        ]);
+      }
     }
 
     try {
-      const parsed = await parseNaturalLanguageQuery(targetQuery, activeAi, (streamText) => {
-        const cleanText = streamText.startsWith('🤔') ? streamText : streamText.replace(/```json|```/g, '').trim();
-        setLogs([
-          { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 小美收到啦："${targetQuery}"` },
-          { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `正在细化推荐…\n\n${cleanText}` },
-        ]);
-      }, controller.signal);
+      let parsed: AppConstraints;
+      if (instantLoad) {
+        parsed = {
+          originalQuery: targetQuery,
+          durationHours: 5,
+          durationDays: 1,
+          targetCity: '北京市',
+          departureCity: undefined,
+          maxDistanceKm: 5,
+          hasChild: true,
+          hasSlimming: true,
+          isFriendsGroup: false,
+          isYouthVibe: false,
+          isThrillFun: false,
+          isCoupleDate: false,
+          isChillRelax: false,
+          isBudgetSaver: false,
+          transportPreference: 'auto',
+          deliveryRequests: [],
+          nodes: [
+            {
+              name: '北京野生动物园',
+              description: '适合带娃近距离看动物',
+              price: 150,
+              duration: 180,
+              tags: ['带娃省心'],
+              position: [116.32, 39.48],
+              type: 'play',
+              day: 1
+            },
+            {
+              name: '素虎素食 (野生动物园附近店)',
+              description: '低卡健康，适合减肥',
+              price: 120,
+              duration: 80,
+              tags: ['低脂控糖'],
+              position: [116.33, 39.49],
+              type: 'eat',
+              day: 1
+            }
+          ]
+        };
+      } else {
+        parsed = await parseNaturalLanguageQuery(targetQuery, activeAi, (streamText) => {
+          const cleanText = streamText.startsWith('🤔') ? streamText : streamText.replace(/```json|```/g, '').trim();
+          setLogs([
+            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 小美收到啦："${targetQuery}"` },
+            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `正在细化推荐…\n\n${cleanText}` },
+          ]);
+        }, controller.signal);
+      }
+
       setConstraints(parsed);
       const newPlan = generateSmartPlan(parsed);
       setPlan(newPlan);
@@ -198,18 +245,21 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
       const logsToAdd: ThoughtLog[] = activeAi
         ? [
             { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 已听懂你的安排："${targetQuery}"` },
-            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `已按「${formatProfileSummary(parsed)}」画像、离家 ${parsed.maxDistanceKm} 公里内挑好店。` },
+            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `已按要求挑好店。` },
           ]
         : [
             { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `👩‍💼 已听懂你的安排："${targetQuery}"` },
-            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `已在 ${parsed.maxDistanceKm} 公里内匹配好路线。` },
+            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `已在附近匹配好路线。` },
           ];
       logsToAdd.push({ timestamp: new Date().toLocaleTimeString(), type: 'success', message: `路线排好啦，地图已连线，需要的话可以直接全包下单。` });
       setLogs(logsToAdd);
 
+      const newHistoryId = Date.now();
+      setCollabSessionId(String(newHistoryId));
+
       if (activeAi) {
         const newHistoryItem: HistoryItem = {
-          id: Date.now(),
+          id: newHistoryId,
           query: targetQuery,
           plan: newPlan,
           constraints: parsed,
@@ -266,292 +316,41 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
     await handlePlan(presetText);
   }, [handlePlan]);
 
-  const handleCollabSubmit = useCallback((options: {
-    role: 'wife' | 'friend' | 'elder';
-    hasSlimming?: boolean;
-    hasChild?: boolean;
-    slowLife?: boolean;
-    anniversaryFlower?: boolean;
-    lazySleep?: boolean;
-    thrillMystery?: boolean;
-    socialDrink?: boolean;
-    artGallery?: boolean;
-    limitedStamina?: boolean;
-    lightNutritious?: boolean;
-    medicineEmergency?: boolean;
-    customText?: string;
-  }) => {
+  const handleCollabSubmit = useCallback((options: any) => {
     if (!plan || !constraints) return;
     
-    // 克隆当前的 nodes 和 constraints 副本
-    let newNodes = [...constraints.nodes];
-    let updatedConstraints = { ...constraints };
-    let thoughtLogs: string[] = [];
+    const items: string[] = [];
+    if (options.hasSlimming) items.push('控糖减肥');
+    if (options.hasChild) items.push('带娃省心');
+    if (options.slowLife) items.push('手作慢生活');
+    if (options.anniversaryFlower) items.push('订花惊喜');
+    if (options.lazySleep) items.push('睡懒觉晚点出发');
+    if (options.thrillMystery) items.push('刺激嗨玩密室');
+    if (options.socialDrink) items.push('社交酒馆小酌');
+    if (options.artGallery) items.push('高颜值看展');
+    if (options.limitedStamina) items.push('体力有限少走路');
+    if (options.lightNutritious) items.push('清淡养生餐饮');
+    if (options.medicineEmergency) items.push('备齐常用药');
+    if (options.photoSpot) items.push('拍照出片');
+    if (options.budgetLimit) items.push('预算有限');
+    if (options.petFriendly) items.push('宠物友好');
+    if (options.customText) items.push(options.customText);
 
-    // ================== 老婆大人👸的场景妥协 ==================
-    if (options.role === 'wife') {
-      thoughtLogs.push(`👩‍💼 已收到老婆大人的微调心愿！`);
-      
-      // 1. 控糖减脂
-      if (options.hasSlimming) {
-        updatedConstraints.hasSlimming = true;
-        // 把卡片中高卡路里的湊凑火锅(eat-6)或赤坂日式烧肉平替为青藤小院精致无糖素食馆(eat-4)
-        newNodes = newNodes.map(n => {
-          if (n.type === 'eat' && !n.name.includes('素食') && !n.name.includes('减脂')) {
-            return {
-              name: '青藤小院 · 精致无糖素食馆',
-              description: '采用无糖配方与有机食材制作，低碳无脂无糖，控糖人士福音。',
-              price: 140,
-              duration: 75,
-              tags: ['精致素食', '有机无糖', '低热量控糖'],
-              position: [116.4755, 39.9510] as [number, number],
-              type: 'eat',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`🌱 已将就餐升级为【青藤小院 · 精致无糖素食馆】，有机控糖，餐人均摄入减少 65%！`);
-      }
-
-      // 2. 带娃省心
-      if (options.hasChild) {
-        updatedConstraints.hasChild = true;
-        // 把首站或常规游玩点替换为顶级亲子奈尔宝游乐园(play-1)
-        let replaced = false;
-        newNodes = newNodes.map(n => {
-          if (n.type === 'play' && !n.name.includes('奈尔宝') && !replaced) {
-            replaced = true;
-            return {
-              name: '奈尔宝家庭中心 (蓝色港湾店)',
-              description: '顶奢室内儿童乐园，配有全职看护与高安全性软包设计，让家长完全解放双手。',
-              price: 198,
-              duration: 120,
-              tags: ['亲子乐园', '高安全性', '儿童最爱'],
-              position: [116.479133, 39.953049] as [number, number],
-              type: 'play',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`👶 关爱儿童！已将首站平替为【奈尔宝家庭中心 (蓝色港湾店)】，适合低龄宝宝畅快玩耍！`);
-      }
-
-      // 3. 慢生活手作
-      if (options.slowLife) {
-        let replaced = false;
-        newNodes = newNodes.map(n => {
-          if (n.type === 'play' && !n.name.includes('手作') && !n.name.includes('奈尔宝') && !replaced) {
-            replaced = true;
-            return {
-              name: '木木手工皮艺DIY工坊',
-              description: '温馨静谧的手手工皮具工坊，专业老师辅导，适合情侣、闺蜜享受慢节奏手作。',
-              price: 135,
-              duration: 100,
-              tags: ['DIY手作', '情侣推荐', '静心慢节奏'],
-              position: [116.469145, 39.944208] as [number, number],
-              type: 'play',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`🎨 慢生活步调！下午行程平替为【木木手工皮艺DIY工坊】，静心手作慢度周末。`);
-      }
-
-      // 4. 一键闪送野兽派玫瑰花
-      if (options.anniversaryFlower) {
-        thoughtLogs.push(`🌹 制造浪漫！美团闪购已为您在【野兽派花艺】订购轻奢高颜值玫瑰，将于聚餐时由骑手闪送到店！`);
-      }
+    if (items.length === 0) {
+      setShowCollabModal(false);
+      return;
     }
 
-    // ================== 小伙伴们🧑‍🤝‍🧑的场景妥协 ==================
-    if (options.role === 'friend') {
-      thoughtLogs.push(`👩‍💼 已收到死党/闺蜜们的微调建议！`);
-      
-      // 1. 懒觉模式
-      if (options.lazySleep) {
-        thoughtLogs.push(`💤 开启懒觉模式！第一天出发起点时间已推迟到 10:30 AM，充足睡眠后再起航。`);
-      }
-
-      // 2. 刺激嗨玩密室
-      if (options.thrillMystery) {
-        updatedConstraints.isThrillFun = true;
-        let replaced = false;
-        newNodes = newNodes.map(n => {
-          if (n.type === 'play' && !n.name.includes('密室') && !replaced) {
-            replaced = true;
-            return {
-              name: '极客部落沉浸式密室 (微恐版)',
-              description: '极具烧脑性的机械解密密室，真人NPC互动，解压心跳神作！',
-              price: 158,
-              duration: 90,
-              tags: ['沉浸密室', '心跳刺激', '解压神作'],
-              position: [116.488056, 39.948611] as [number, number],
-              type: 'play',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`🔑 心跳加速！游玩卡片平替为【极客部落沉浸式密室】，烧脑机关与NPC超强互动！`);
-      }
-
-      // 3. 社交小酌
-      if (options.socialDrink) {
-        newNodes = newNodes.map(n => {
-          if (n.type === 'eat' && !n.name.includes('社交酒馆')) {
-            return {
-              name: '小木屋米酒屋 · 延边社交酒馆',
-              description: '主打延边特色蓝莓米酒与辣鸡爪，把酒言欢，夜生活气氛极其热闹。',
-              price: 110,
-              duration: 90,
-              tags: ['社交酒馆', '把酒言欢', '夜生活胜地'],
-              position: [116.4830, 39.9560] as [number, number],
-              type: 'eat',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`🍶 把酒言欢！晚餐置换为【小木屋米酒屋 · 延边社交酒馆】，喝一口香甜微醺的特色蓝莓米酒！`);
-      }
-
-      // 4. 艺术展高颜值打卡
-      if (options.artGallery) {
-        let replaced = false;
-        newNodes = newNodes.map(n => {
-          if (n.type === 'play' && !n.name.includes('艺术展') && !n.name.includes('密室') && !replaced) {
-            replaced = true;
-            return {
-              name: 'UCCA尤伦斯当代艺术中心展',
-              description: '当前火爆的先锋艺术家中国首展，现场空间极具张力，拍照高颜值上镜。',
-              price: 120,
-              duration: 90,
-              tags: ['潮流展览', '高颜值拍照', '男女聚会'],
-              position: [116.493863, 39.986877] as [number, number],
-              type: 'play',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`🖼️ 拍照打卡！午后平替为【UCCA尤伦斯当代艺术中心展】，超高上镜度，制霸朋友圈。`);
-      }
-    }
-
-    // ================== 随行长辈👴的场景妥协 ==================
-    if (options.role === 'elder') {
-      thoughtLogs.push(`👩‍💼 已收到随行长辈的养生叮嘱！`);
-
-      // 1. 体力有限
-      if (options.limitedStamina) {
-        updatedConstraints.transportPreference = 'taxi'; // 长途出行强制打车
-        thoughtLogs.push(`🚗 关怀体力！管家小美已将路线中的长距离步行彻底优化，全线更换为美团打车无缝接送！`);
-      }
-
-      // 2. 清淡养生
-      if (options.lightNutritious) {
-        newNodes = newNodes.map(n => {
-          if (n.type === 'eat' && !n.name.includes('西贝')) {
-            return {
-              name: '西贝莜面村 (家庭亲子餐厅)',
-              description: '主打少油低脂天然莜面，承诺不加香精色素，温热清汤极好消化。',
-              price: 95,
-              duration: 70,
-              tags: ['无香精色素', '温热养生', '适合长辈'],
-              position: [116.4795, 39.9535] as [number, number],
-              type: 'eat',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`🍲 养生清淡！聚餐置换为【西贝莜面村】，少油低脂，天然好面暖胃好消化！`);
-      }
-
-      // 3. 药箱防备
-      if (options.medicineEmergency) {
-        thoughtLogs.push(`💊 医疗保备！已在美团买药【24小时药急送】订购晕车片、防蚊凉感贴等，由骑手极速15分钟内送达！`);
-      }
-    }
-
-    // ================== ✍️ 智能自由文本意图提取引擎 ==================
-    if (options.customText && options.customText.trim()) {
-      const text = options.customText.toLowerCase();
-      thoughtLogs.push(`💬 接收到家人文字心愿：「${options.customText}」`);
-      
-      // A. 正则匹配“累/回家/休息” -> 截断后续行程
-      if (/(累|疲|回家|休息|走不动|退|不走)/.test(text)) {
-        if (newNodes.length > 2) {
-          newNodes = newNodes.slice(0, 2); // 砍掉后续游玩，只留首站和吃饭，直接缩减
-          thoughtLogs.push(`🛌 小美体贴入微：已为您截断并舍弃了后续高体力的游玩行程，让全家人早早休整！`);
-        }
-      }
-      // B. 正则匹配“奶茶/喝的/茶百道” -> 自动拼单奶茶外卖
-      else if (/(奶茶|喝|奶绿|甜品|茶百道|霸王茶姬|瑞幸|咖啡|喜茶)/.test(text)) {
-        thoughtLogs.push(`🧋 幸福加餐！小美已通过美团闪购拼单【霸王茶姬 · 伯牙绝弦奶茶】，外卖将于聚餐时火速闪送到店！`);
-      }
-      // C. 正则匹配“海鲜/烧肉/日料” -> 平替烧肉店
-      else if (/(海鲜|烧肉|烤肉|日料|寿司|肉)/.test(text)) {
-        newNodes = newNodes.map(n => {
-          if (n.type === 'eat' && !n.name.includes('烧肉')) {
-            return {
-              name: '赤坂炙烤 · 潮流日式烧肉店',
-              description: '工业风烤肉排队王，M9和牛雪花排与厚切牛舌，油脂丰盛，极度解馋！',
-              price: 220,
-              duration: 80,
-              tags: ['和牛烧肉', '肉质极佳', '极度解馋'],
-              position: [116.4812, 39.9548] as [number, number],
-              type: 'eat',
-              day: n.day || 1
-            };
-          }
-          return n;
-        });
-        thoughtLogs.push(`🥩 馋肉啦！餐饮地标平替为【赤坂炙烤 · 潮流日式烧肉店】，和牛盛宴大口满足！`);
-      }
-      // D. 正则匹配“药/感冒/不舒服” -> 自动拼单买药
-      else if (/(药|疼|感冒|晕|不舒服|腹|肚)/.test(text)) {
-        thoughtLogs.push(`🩺 关怀备至！小美已通过【美团买药】为您加购了防暑感冒包与晕车贴，由美团专送15分钟内送达！`);
-      }
-    }
-
-    // ================== 一键全家妥协，AI Re-planning 重构重算 ==================
-    // 更新 constraints 的 nodes
-    updatedConstraints.nodes = newNodes;
-    setConstraints(updatedConstraints);
-
-    // 重新规划并清空旧 Plan，触发 10ms 极智平替
-    const finalPlan = generateSmartPlan(updatedConstraints);
+    // 拼接到旧的 query 后
+    const appendText = `同行人新加了需求：${items.join('、')}。请结合这些新要求对之前的方案进行重新规划调整！`;
+    const newQuery = query ? `${query}。${appendText}` : appendText;
     
-    // 如果是懒觉模式，调整 Timeline 开头的第一天起跑时间
-    if (options.lazySleep && finalPlan.timeline.length > 0) {
-      let runMin = 10 * 60 + 30; // 10:30
-      finalPlan.timeline.forEach((item) => {
-        if (item.day === 1) {
-          const hh = Math.floor(runMin / 60);
-          const mm = Math.round(runMin % 60);
-          item.time = `${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`;
-          runMin += item.duration + (item.travelTimeToNext || 0);
-        }
-      });
-    }
-
-    setPlan(finalPlan);
-
-    // 大屏情商 Thought Logs 流式打出
-    const completeLogs: ThoughtLog[] = [
-      { timestamp: new Date().toLocaleTimeString(), type: 'replan', message: `👨‍👩‍👧 正在为您解决家庭决策冲突，启动「全家大妥协」Re-planning 机制...` }
-    ];
-    thoughtLogs.forEach(msg => {
-      completeLogs.push({ timestamp: new Date().toLocaleTimeString(), type: 'thought', message: msg });
-    });
-    completeLogs.push({ timestamp: new Date().toLocaleTimeString(), type: 'success', message: `🎉 达成共识！已重新计算高德路网、分天交通安排以及美团大收银台全包账单！` });
-    setLogs(completeLogs);
+    setQuery(newQuery);
     setShowCollabModal(false);
-  }, [plan, constraints]);
+    
+    // 触发真实的 AI 重新规划
+    handlePlan(newQuery, true);
+  }, [plan, constraints, query, handlePlan]);
 
   /** 打开协同Modal：自动生成或复用 SessionId */
   const openCollabModal = useCallback(() => {
@@ -561,73 +360,101 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
     setShowCollabModal(true);
   }, [collabSessionId]);
 
-  const handleSwapOrder = useCallback(() => {
-    if (!plan || !constraints || plan.timeline.length < 3) return;
-    const node1 = plan.timeline[1].node;
-    const node2 = plan.timeline[2].node;
+  const handleMoveNode = useCallback((nodeId: string, direction: 'up' | 'down') => {
+    if (!plan || !constraints) return;
     const nodeNames = constraints.nodes.map(n => n.name);
-    const idx1 = nodeNames.indexOf(node1.name);
-    const idx2 = nodeNames.indexOf(node2.name);
-    if (idx1 !== -1 && idx2 !== -1) {
-      const newNodes = [...constraints.nodes];
-      [newNodes[idx1], newNodes[idx2]] = [newNodes[idx2], newNodes[idx1]];
-      const updated = { ...constraints, nodes: newNodes };
-      setConstraints(updated);
-      setPlan(generateSmartPlan(updated));
-    } else {
-      setPlan(generateSmartPlan(constraints, [node2.name, node1.name]));
-    }
-    setLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'replan', message: `🔄 已调换景点顺序，智能错开高峰就餐时间！` }]);
+    const idx = plan.timeline.findIndex(t => t.node.id === nodeId);
+    if (idx === -1) return;
+    const currentNodeName = plan.timeline[idx].node.name;
+    const constraintIdx = nodeNames.indexOf(currentNodeName);
+    if (constraintIdx === -1) return;
+
+    const targetConstraintIdx = direction === 'up' ? constraintIdx - 1 : constraintIdx + 1;
+    if (targetConstraintIdx < 0 || targetConstraintIdx >= constraints.nodes.length) return;
+
+    const newNodes = [...constraints.nodes];
+    [newNodes[constraintIdx], newNodes[targetConstraintIdx]] = [newNodes[targetConstraintIdx], newNodes[constraintIdx]];
+    const updated = { ...constraints, nodes: newNodes };
+    setConstraints(updated);
+    setPlan(generateSmartPlan(updated));
+    setLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'replan', message: `🔄 已根据您的要求调整「${currentNodeName}」的游玩顺序！` }]);
   }, [plan, constraints]);
 
-  const handleShuffleNode = useCallback((nodeId: string, type: 'play' | 'eat') => {
+  const handleShuffleNode = useCallback(async (nodeId: string, type: 'play' | 'eat') => {
     if (!plan || !constraints) return;
     const timelineItem = plan.timeline.find(t => t.node.id === nodeId);
     if (!timelineItem) return;
     const currentNode = timelineItem.node;
-    const isBeijingRoute = constraints.maxDistanceKm >= 30 || constraints.nodes.some(n => /(天坛|故宫|颐和园|北京)/.test(n.name));
-
-    let candidates: any[] = [];
-    if (isBeijingRoute) {
-      candidates = type === 'play'
-        ? [
-            { name: '景山公园', description: '登顶万春亭俯瞰紫禁城全景。', price: 2, duration: 60, tags: ['俯瞰故宫'], position: [116.4, 39.923], type: 'play' },
-            { name: '北海公园', description: '游览白塔与九龙壁。', price: 10, duration: 90, tags: ['皇家园林'], position: [116.388, 39.927], type: 'play' },
-            { name: '圆明园遗址公园', description: '凭吊西洋楼遗址。', price: 25, duration: 120, tags: ['历史遗迹'], position: [116.302, 40.007], type: 'play' },
-          ]
-        : [
-            { name: '四季民福烤鸭店 (故宫店)', description: '正宗挂炉烤鸭。', price: 120, duration: 80, tags: ['挂炉烤鸭'], position: [116.406, 39.916], type: 'eat' },
-            { name: '东来顺 (天坛老字号店)', description: '百年铜锅涮肉。', price: 110, duration: 75, tags: ['铜锅涮肉'], position: [116.413, 39.878], type: 'eat' },
-            { name: '素虎素食 (中关村店)', description: '高端轻食净素馆。', price: 130, duration: 80, tags: ['低热量控糖'], position: [116.315, 39.982], type: 'eat' },
-          ];
-      if (type === 'eat' && constraints.hasSlimming) {
-        const slim = candidates.filter(c => c.tags.some((t: string) => t.includes('低') || t.includes('素')));
-        if (slim.length > 0) candidates = slim;
+    
+    try {
+      setLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `🔄 正在联网为您智能寻找「${currentNode.name}」的绝佳平替...` }]);
+      
+      let picked: any = null;
+      if (useAi) {
+        const nodeToReplace = {
+          name: currentNode.name,
+          description: currentNode.description,
+          price: currentNode.price,
+          duration: currentNode.duration,
+          tags: currentNode.tags || [],
+          position: currentNode.position || [116.4, 39.9],
+          type: type,
+          day: timelineItem.day
+        } as any;
+        picked = await generateAlternativeNode(nodeToReplace, constraints, (streamText: string) => {
+          const cleanText = streamText.replace(/```json|```/g, '').trim();
+          setLogs(prev => [
+            ...prev.slice(0, -1),
+            { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `🧠 AI 正在构思平替方案：\n${cleanText}` }
+          ]);
+        });
+      } else {
+        // Fallback to local mock
+        const isBeijingRoute = constraints.maxDistanceKm >= 30 || constraints.nodes.some(n => /(天坛|故宫|颐和园|北京)/.test(n.name));
+        let candidates: any[] = [];
+        if (isBeijingRoute) {
+          candidates = type === 'play'
+            ? [
+                { name: '景山公园', description: '登顶万春亭俯瞰紫禁城全景。', price: 2, duration: 60, tags: ['俯瞰故宫'], position: [116.4, 39.923], type: 'play' },
+                { name: '北海公园', description: '游览白塔与九龙壁。', price: 10, duration: 90, tags: ['皇家园林'], position: [116.388, 39.927], type: 'play' },
+                { name: '圆明园遗址公园', description: '凭吊西洋楼遗址。', price: 25, duration: 120, tags: ['历史遗迹'], position: [116.302, 40.007], type: 'play' },
+              ]
+            : [
+                { name: '四季民福烤鸭店 (故宫店)', description: '正宗挂炉烤鸭。', price: 120, duration: 80, tags: ['挂炉烤鸭'], position: [116.406, 39.916], type: 'eat' },
+                { name: '东来顺 (天坛老字号店)', description: '百年铜锅涮肉。', price: 110, duration: 75, tags: ['铜锅涮肉'], position: [116.413, 39.878], type: 'eat' },
+                { name: '素虎素食 (中关村店)', description: '高端轻食净素馆。', price: 130, duration: 80, tags: ['低热量控糖'], position: [116.315, 39.982], type: 'eat' },
+              ];
+        } else {
+          candidates = MOCK_LOCATIONS.filter(n => {
+            if (n.type !== type || n.id === currentNode.id) return false;
+            const dist = Math.sqrt(Math.pow(n.coords.x - currentNode.coords.x, 2) + Math.pow(n.coords.y - currentNode.coords.y, 2)) * 0.05;
+            if (dist > constraints.maxDistanceKm) return false;
+            if (type === 'play' && constraints.hasChild && !n.suitableFor.includes('child')) return false;
+            if (type === 'eat' && constraints.hasSlimming && !n.suitableFor.includes('slimming')) return false;
+            return true;
+          });
+        }
+        candidates = candidates.filter(c => !constraints.nodes.some(ex => ex.name === c.name));
+        if (candidates.length === 0) { alert('暂无更多符合条件的平替选项～'); return; }
+        picked = candidates[Math.floor(Math.random() * candidates.length)];
       }
-    } else {
-      candidates = MOCK_LOCATIONS.filter(n => {
-        if (n.type !== type || n.id === currentNode.id) return false;
-        const dist = Math.sqrt(Math.pow(n.coords.x - currentNode.coords.x, 2) + Math.pow(n.coords.y - currentNode.coords.y, 2)) * 0.05;
-        if (dist > constraints.maxDistanceKm) return false;
-        if (type === 'play' && constraints.hasChild && !n.suitableFor.includes('child')) return false;
-        if (type === 'eat' && constraints.hasSlimming && !n.suitableFor.includes('slimming')) return false;
-        return true;
-      });
+
+      const updatedNodes = constraints.nodes.map(n => n.name === currentNode.name ? picked : n);
+      const updated = { ...constraints, nodes: updatedNodes };
+      setConstraints(updated);
+      setPlan(generateSmartPlan(updated));
+      setLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'success', message: `✨ 已将「${currentNode.name}」平替为「${picked.name}」，重新计算行程连线！` }]);
+    } catch (e) {
+      console.error(e);
+      alert('AI 生成平替方案失败，请重试');
     }
-    candidates = candidates.filter(c => !constraints.nodes.some(ex => ex.name === c.name));
-    if (candidates.length === 0) { alert('暂无更多符合条件的平替选项～'); return; }
-    const picked = candidates[Math.floor(Math.random() * candidates.length)];
-    const updatedNodes = constraints.nodes.map(n => n.name === currentNode.name ? { ...picked } : n);
-    const updated = { ...constraints, nodes: updatedNodes };
-    setConstraints(updated);
-    setPlan(generateSmartPlan(updated));
-    setLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'thought', message: `🔍 已平替为「${picked.name}」，重新计算行程连线！` }]);
-  }, [plan, constraints]);
+  }, [plan, constraints, useAi]);
 
   const handleRestoreHistory = useCallback((item: HistoryItem) => {
     setConstraints(item.constraints);
     setPlan(item.plan);
     setQuery(item.query);
+    setCollabSessionId(String(item.id));
     setLogs([{ timestamp: new Date().toLocaleTimeString(), type: 'replan', message: `🕰️ 已回溯至「${item.query}」的精选方案！` }]);
   }, []);
 
@@ -682,7 +509,7 @@ export function PlanningProvider({ children }: { children: ReactNode }) {
       isLoading, useAi, setUseAi, showCashierModal, setShowCashierModal,
       isPaying, isListening, confetti, isPlanFromAi, historyList,
       showCollabModal, setShowCollabModal, openCollabModal, collabSessionId, handleCollabSubmit,
-      handlePlan, handlePlanPreset, handleSwapOrder, handleShuffleNode,
+      handlePlan, handlePlanPreset, handleMoveNode, handleShuffleNode,
       handleRestoreHistory, handleClearHistory, handleDeleteHistory, handleOneClickBuy,
       handlePaymentSubmit, toggleListening,
     }}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Home, Compass, UtensilsCrossed, ArrowDownUp, 
+  Home, Compass, UtensilsCrossed, ArrowUp, ArrowDown,
   RefreshCw, Clock, DollarSign, Users, AlertTriangle,
   Train, Car, Footprints, Bus, Plane
 } from 'lucide-react';
@@ -377,7 +377,7 @@ export const SubwayRoutePanel: React.FC<SubwayRoutePanelProps> = ({
 
 interface TimelineCardsProps {
   timeline: TimelineItem[];
-  onSwapOrder: () => void;
+  onMoveNode: (nodeId: string, direction: 'up' | 'down') => void;
   onShuffleNode: (nodeId: string, type: 'play' | 'eat') => void;
   isExecuting: boolean;
   targetCity?: string;
@@ -385,7 +385,7 @@ interface TimelineCardsProps {
 
 export const TimelineCards: React.FC<TimelineCardsProps> = ({
   timeline,
-  onSwapOrder,
+  onMoveNode,
   onShuffleNode,
   isExecuting,
   targetCity
@@ -518,7 +518,7 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
                   <div className="mt-3 flex items-start space-x-2 bg-red-50 border border-red-100 p-2.5 rounded-2xl text-red-800 text-[10px] leading-relaxed">
                     <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5 animate-bounce" />
                     <div>
-                      <span className="font-extrabold">⚠️ 美团实时排队预警</span>
+                      <span className="font-extrabold">⚠️ 小美实时排队预警</span>
                       ：该餐厅当前正值用餐高峰，前方现场排号已达 <span className="font-extrabold font-mono text-red-600">48</span> 桌，等待长达 <span className="font-extrabold font-mono text-red-600">110</span> 分钟。下单时，管家将启动 **Re-Planning** 自动为您平替最优空闲席位。
                     </div>
                   </div>
@@ -554,15 +554,30 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
                         <DollarSign className="w-3.5 h-3.5 mr-0.5 text-slate-400" />
                         约 {item.node.price} 元/人
                       </span>
-                      {nodeType === 'eat' && item.node.realtimeStatus.queueTables > 0 && (
-                        <span className={`flex items-center ${item.node.id === 'eat-6' ? 'text-red-500' : 'text-amber-600'}`}>
-                          <Users className="w-3.5 h-3.5 mr-1" />
-                          现场排队 {item.node.realtimeStatus.queueTables} 桌
-                        </span>
+                      {nodeType === 'eat' && (
+                        <>
+                          <span className={`flex items-center ${
+                            item.node.realtimeStatus.queueTables > 0 
+                              ? (item.node.id === 'eat-6' ? 'text-red-500' : 'text-amber-600')
+                              : 'text-emerald-500'
+                          }`}>
+                            <Users className="w-3.5 h-3.5 mr-1" />
+                            {item.node.realtimeStatus.queueTables > 0 
+                              ? `现场排队 ${item.node.realtimeStatus.queueTables} 桌`
+                              : '目前有空位，免排队'}
+                          </span>
+                          <button className={`ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors ${
+                            item.node.realtimeStatus.queueTables > 0 
+                              ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                              : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                          }`}>
+                            {item.node.realtimeStatus.queueTables > 0 ? '提前取号' : '一键订座'}
+                          </button>
+                        </>
                       )}
                     </div>
 
-                    {/* 操作按键：换一换、调换吃玩 */}
+                    {/* 操作按键：换一换、调换顺序 */}
                     {!isExecuting && (
                       <div className="flex space-x-1.5">
                         <button 
@@ -572,16 +587,27 @@ export const TimelineCards: React.FC<TimelineCardsProps> = ({
                           <RefreshCw className="w-2.8 h-2.8 mr-0.5 text-slate-400" />
                           换一换
                         </button>
-                        {/* 调换顺序按钮：为方便体验，只在第一个非起步卡片提供调换吃玩快捷键 */}
-                        {index === 1 && timeline.length >= 3 && (
-                          <button 
-                            onClick={onSwapOrder}
-                            className="flex items-center px-2 py-1 rounded-xl bg-slate-50 text-slate-600 border border-slate-200/80 active:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
-                          >
-                            <ArrowDownUp className="w-2.8 h-2.8 mr-0.5 text-slate-400" />
-                            调换吃玩
-                          </button>
-                        )}
+                        
+                        <div className="flex space-x-1">
+                          {index > 1 && (
+                            <button 
+                              onClick={() => onMoveNode(item.node.id, 'up')}
+                              title="上移"
+                              className="flex items-center justify-center w-6 h-6 rounded-xl bg-slate-50 text-slate-600 border border-slate-200/80 active:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+                            >
+                              <ArrowUp className="w-3 h-3" />
+                            </button>
+                          )}
+                          {index > 0 && index < timeline.length - 1 && (
+                            <button 
+                              onClick={() => onMoveNode(item.node.id, 'down')}
+                              title="下移"
+                              className="flex items-center justify-center w-6 h-6 rounded-xl bg-slate-50 text-slate-600 border border-slate-200/80 active:bg-slate-100 hover:text-slate-800 transition-colors cursor-pointer"
+                            >
+                              <ArrowDown className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

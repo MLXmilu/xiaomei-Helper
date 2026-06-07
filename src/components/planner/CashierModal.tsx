@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, ShoppingBag, Coffee, Flower2, CheckCircle2, Loader2, ExternalLink, MapPin } from 'lucide-react';
+import { X, ShoppingBag, Coffee, Flower2, CheckCircle2, Loader2, MapPin } from 'lucide-react';
 import { usePlanning } from '../../context/PlanningContext';
 
 const FALLBACK_ITEMS = [
@@ -45,7 +45,7 @@ export function CashierModal() {
           const isDrink = poi.type.includes('饮') || poi.type.includes('茶') || poi.type.includes('咖啡');
           return {
             id: poi.id || `real_${index}`,
-            type: isDrink ? 'drink' : 'gift',
+            type: isDrink ? 'drink' : 'icon',
             icon: isDrink ? Coffee : Flower2,
             name: poi.name,
             desc: `高德真实数据 · ${poi.address || '周边推荐'}`,
@@ -90,11 +90,6 @@ export function CashierModal() {
     }, 1500);
   };
 
-  const jumpToMeituan = (keyword: string) => {
-    const dianpingSearchUrl = `https://www.dianping.com/search/keyword/1/0_${encodeURIComponent(keyword)}`;
-    window.open(dianpingSearchUrl, '_blank');
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div 
@@ -120,6 +115,37 @@ export function CashierModal() {
 
         {step === 'cart' && (
           <div className="p-5 space-y-6">
+            
+            {/* 行程必选项：门票与订座 */}
+            <div>
+              <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> 行程自动安排事项
+              </p>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">🎫</span>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">各游玩项门票预订</p>
+                      <p className="text-[10px] text-slate-500">免排队自动出票</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-emerald-500">已包含</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center">🍽️</span>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">所有餐厅订座/取号</p>
+                      <p className="text-[10px] text-slate-500">到店即吃免等待</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-emerald-500">已包含</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 高德真实发现周边好物附加 */}
             <div>
               <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest mb-3 flex items-center gap-1">
                 <MapPin className="w-3 h-3" /> 高德实时探索周边好店
@@ -177,9 +203,9 @@ export function CashierModal() {
               >
                 <span className="flex items-center gap-2">
                   <ShoppingBag className="w-5 h-5" />
-                  确认并支付
+                  一键下单全部并预约
                 </span>
-                <span className="text-lg">¥{finalTotal}</span>
+                <span className="text-lg">总计 ¥{plan.totalCost + finalTotal}</span>
               </button>
             </div>
           </div>
@@ -188,57 +214,60 @@ export function CashierModal() {
         {step === 'paying' && (
           <div className="p-12 flex flex-col items-center justify-center space-y-4">
             <Loader2 className="w-10 h-10 text-meituan animate-spin" />
-            <p className="text-slate-600 font-bold">正在为您锁定座位并呼叫骑手...</p>
+            <p className="text-slate-600 font-bold">正在为您自动预订门票、锁定座位并呼叫骑手...</p>
           </div>
         )}
 
         {step === 'tracking' && (
           <div className="p-6 space-y-6">
             
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
-              <div className="w-16 h-16 bg-white rounded-full shadow-md mx-auto flex items-center justify-center mb-3 border-4 border-amber-100 z-10 relative">
-                <span className="text-3xl">🚴‍♂️</span>
+            {/* 执行结果汇总 */}
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 text-emerald-700">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <span className="font-bold text-sm">游玩门票均已出票成功，出示二维码入园即可</span>
               </div>
-              <h3 className="text-lg font-black text-slate-800 relative z-10">骑手已接单</h3>
-              <p className="text-sm text-slate-600 mt-2 font-medium relative z-10">
-                美团骑手 <b>王师傅</b> 正在前往真实商铺取件。<br/>
-                预计将在您到达第一站时准时送达！
-              </p>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 text-emerald-700">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <span className="font-bold text-sm">所有就餐餐厅已成功订座/提前取号</span>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {upsellItems.filter(i => selectedItems.includes(i.id)).map(item => (
-                <div key={item.id} className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-3">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{item.name}</p>
-                      <p className="text-xs text-slate-500">商家正在制作中...</p>
-                    </div>
-                    <span className="text-xs font-black text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">极速派送中</span>
+            {selectedItems.length > 0 && (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-center relative overflow-hidden mt-4">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                  <div className="w-16 h-16 bg-white rounded-full shadow-md mx-auto flex items-center justify-center mb-3 border-4 border-amber-100 z-10 relative">
+                    <span className="text-3xl">🚴‍♂️</span>
                   </div>
-                  
-                  <button
-                    onClick={() => jumpToMeituan(item.keyword)}
-                    className="w-full py-2.5 rounded-lg bg-white border border-slate-200 text-sm font-bold text-slate-700 hover:border-meituan hover:text-slate-900 transition-colors flex items-center justify-center gap-2 shadow-sm"
-                  >
-                    在大众点评中查看真实商品 <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
+                  <h3 className="text-lg font-black text-slate-800 relative z-10">附加惊喜 骑手已接单</h3>
+                  <p className="text-sm text-slate-600 mt-2 font-medium relative z-10">
+                    小美骑手 <b>王师傅</b> 正在前往真实商铺取件。<br/>
+                    系统已安排在您就餐时，准时送达您指定的餐厅！
+                  </p>
                 </div>
-              ))}
-              
-              {selectedItems.length === 0 && (
-                <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center">
-                  <p className="text-sm font-bold text-slate-800">未选择任何商品</p>
+
+                <div className="space-y-3">
+                  {upsellItems.filter(i => selectedItems.includes(i.id)).map(item => (
+                    <div key={item.id} className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col gap-3">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{item.name}</p>
+                          <p className="text-xs text-slate-500">商家正在制作中...</p>
+                        </div>
+                        <span className="text-xs font-black text-emerald-500 bg-emerald-50 px-2 py-1 rounded-md">等待送往餐厅</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
-            </div>
+              </>
+            )}
 
             <button
               onClick={() => setShowCashierModal(false)}
-              className="w-full py-3.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-colors"
+              className="w-full py-3.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-slate-800 transition-colors mt-4"
             >
-              返回我的行程
+              太棒了，返回我的行程
             </button>
 
           </div>

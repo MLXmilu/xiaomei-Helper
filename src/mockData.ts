@@ -208,7 +208,7 @@ export const MOCK_LOCATIONS: LocationNode[] = [
   },
   {
     id: 'retail-3',
-    name: '美团买药 · 24小时药急送',
+    name: '小美买药 · 24小时药急送',
     type: 'retail',
     coords: { x: 48, y: 60 },
     position: [116.474000, 39.946000],

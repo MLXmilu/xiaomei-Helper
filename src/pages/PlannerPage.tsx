@@ -19,15 +19,17 @@ export function PlannerPage() {
   const location = useLocation();
   const {
     plan, useAi, isLoading, simulateError, setSimulateError,
-    handlePlan, handleSwapOrder, handleShuffleNode, isExecuting,
-    openCollabModal
+    handlePlan, handleMoveNode, handleShuffleNode, isExecuting,
+    openCollabModal, setQuery
   } = usePlanning();
 
-
   useEffect(() => {
-    const query = (location.state as { query?: string })?.query;
-    if (query) handlePlan(query);
-  }, [location.state, handlePlan]);
+    const state = location.state as { query?: string; instantLoad?: boolean } | null;
+    if (state?.query) {
+      setQuery(state.query);
+      handlePlan(state.query, undefined, state.instantLoad);
+    }
+  }, [location.state, handlePlan, setQuery]);
 
   return (
     <>
@@ -58,10 +60,10 @@ export function PlannerPage() {
 
 
           {/* 右内容区：flex双列，右侧边栏始终固定 */}
-          <div className="flex gap-4 items-start min-w-0">
+          <div className="flex flex-col sm:flex-row gap-4 items-start min-w-0">
 
             {/* 主内容区 */}
-            <div className="flex-1 space-y-5 min-w-0">
+            <div className="flex-1 space-y-5 min-w-0 w-full sm:w-auto order-2 sm:order-1">
 
               {/* 加载中：显示旋转占位，AI 思考过程见右侧边栏 */}
               {isLoading && !plan && (
@@ -125,9 +127,9 @@ export function PlannerPage() {
                       </button>
                     </div>
 
-                    <TimelineCards
-                      timeline={plan.timeline}
-                      onSwapOrder={handleSwapOrder}
+                    <TimelineCards 
+                      timeline={plan.timeline} 
+                      onMoveNode={handleMoveNode}
                       onShuffleNode={handleShuffleNode}
                       isExecuting={isExecuting}
                       targetCity={plan.targetCity}
@@ -138,7 +140,7 @@ export function PlannerPage() {
             </div>
 
             {/* 右侧固定边栏：AI 思考泡泡 + 出行画像（始终显示） */}
-            <div className="hidden sm:flex flex-col gap-3 w-64 shrink-0 pt-1">
+            <div className="flex flex-col gap-3 w-full sm:w-64 shrink-0 pt-1 order-1 sm:order-2">
               <div className="shadow-lg rounded-3xl">
                 <AssistantBubble />
               </div>

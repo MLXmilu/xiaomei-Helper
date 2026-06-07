@@ -7,6 +7,26 @@ import {
 } from '../lib/collabStore';
 import type { AppConstraints } from '../agentEngine';
 
+const COMMON_OPTIONS = [
+  { key: 'hasSlimming', emoji: '🥗', title: '控糖减肥' },
+  { key: 'hasChild', emoji: '👶', title: '带娃省心' },
+  { key: 'slowLife', emoji: '🎨', title: '手作慢生活' },
+  { key: 'anniversaryFlower', emoji: '🌹', title: '纪念日惊喜' },
+  { key: 'lazySleep', emoji: '😴', title: '懒觉模式' },
+  { key: 'thrillMystery', emoji: '🔑', title: '刺激密室' },
+  { key: 'socialDrink', emoji: '🍶', title: '社交小酌' },
+  { key: 'artGallery', emoji: '🖼️', title: '潮流展览' },
+  { key: 'limitedStamina', emoji: '🚗', title: '体力有限' },
+  { key: 'lightNutritious', emoji: '🍲', title: '清淡暖胃' },
+  { key: 'medicineEmergency', emoji: '💊', title: '备齐常用药' },
+  { key: 'photoSpot', emoji: '📸', title: '拍照出片' },
+  { key: 'budgetLimit', emoji: '💰', title: '预算有限' },
+  { key: 'petFriendly', emoji: '🐶', title: '宠物友好' },
+  { key: 'avoidCrowd', emoji: '🤫', title: '避开人流' },
+  { key: 'localSnack', emoji: '🍢', title: '特色小吃' },
+  { key: 'needCoffee', emoji: '☕', title: '咖啡续命' },
+];
+
 const ROLE_CONFIG = {
   wife: {
     emoji: '👸',
@@ -17,12 +37,6 @@ const ROLE_CONFIG = {
     border: 'border-rose-200',
     accent: 'accent-rose-500',
     tag: 'bg-rose-100 text-rose-700',
-    options: [
-      { key: 'hasSlimming', emoji: '🥗', title: '控糖减肥', desc: '聚餐一键平替【青藤素食馆】，减脂无负担' },
-      { key: 'hasChild', emoji: '👶', title: '带娃省心', desc: '首站换【奈尔宝亲子乐园】，专业看护解放双手' },
-      { key: 'slowLife', emoji: '🎨', title: '手作慢生活', desc: '下午留给【木木皮艺DIY】，静心做手工' },
-      { key: 'anniversaryFlower', emoji: '🌹', title: '纪念日惊喜', desc: '美团闪购代订【野兽派玫瑰】，骑手送达餐厅' },
-    ],
   },
   friend: {
     emoji: '🧑‍🤝‍🧑',
@@ -33,12 +47,6 @@ const ROLE_CONFIG = {
     border: 'border-blue-200',
     accent: 'accent-blue-500',
     tag: 'bg-blue-100 text-blue-700',
-    options: [
-      { key: 'lazySleep', emoji: '😴', title: '懒觉模式', desc: '帮把第一天出发时间推迟到 10:30，睡够再出发' },
-      { key: 'thrillMystery', emoji: '🔑', title: '刺激密室', desc: '饭后打卡【极客部落沉浸式密室】，烧脑解压' },
-      { key: 'socialDrink', emoji: '🍶', title: '社交小酌', desc: '晚餐换【小木屋米酒屋】，延边蓝莓米酒把酒言欢' },
-      { key: 'artGallery', emoji: '🖼️', title: '潮流展览', desc: '安排【UCCA尤伦斯展】打卡，超高颜值发朋友圈' },
-    ],
   },
   elder: {
     emoji: '👴',
@@ -49,11 +57,6 @@ const ROLE_CONFIG = {
     border: 'border-emerald-200',
     accent: 'accent-emerald-500',
     tag: 'bg-emerald-100 text-emerald-700',
-    options: [
-      { key: 'limitedStamina', emoji: '🚗', title: '体力有限', desc: '中长距离改为美团打车，不用走路累坏啦' },
-      { key: 'lightNutritious', emoji: '🍲', title: '清淡暖胃', desc: '聚餐换无香精的【西贝莜面村】，温热好消化' },
-      { key: 'medicineEmergency', emoji: '💊', title: '备齐常用药', desc: '美团买药闪送晕车片、防暑贴，15分钟到' },
-    ],
   },
 } as const;
 
@@ -66,7 +69,7 @@ function buildSummaryText(
   customText: string
 ): string {
   const cfg = ROLE_CONFIG[role];
-  const selected = cfg.options
+  const selected = COMMON_OPTIONS
     .filter((o) => checked[o.key])
     .map((o) => o.title);
   const parts: string[] = [];
@@ -107,7 +110,7 @@ export default function CollabPage() {
         submitterName: roleCfg.short,
         role,
         ...Object.fromEntries(
-          roleCfg.options.map((o) => [o.key, !!checked[o.key]])
+          COMMON_OPTIONS.map((o) => [o.key, !!checked[o.key]])
         ),
         customText: customText.trim() || undefined,
       };
@@ -128,8 +131,8 @@ export default function CollabPage() {
 
   if (!isValid) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-6">
-        <div className="text-center text-white space-y-4">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-slate-900 rounded-3xl p-10 text-center text-white space-y-4 shadow-2xl">
           <div className="text-6xl">🔗</div>
           <h1 className="text-xl font-black">链接已失效或格式错误</h1>
           <p className="text-slate-400 text-sm">请向规划者重新索取协同链接</p>
@@ -140,8 +143,8 @@ export default function CollabPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 flex items-center justify-center p-6">
-        <div className="text-center space-y-6 max-w-sm">
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <div className="w-full max-w-md bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 rounded-3xl p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto shadow-2xl text-5xl animate-[bounceIn_0.6s_ease-out]">
             ✅
           </div>
@@ -165,13 +168,14 @@ export default function CollabPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-32">
+    <div className="min-h-screen bg-slate-100 flex justify-center">
+      <div className="w-full max-w-md bg-slate-50 min-h-screen shadow-2xl relative pb-32 overflow-x-hidden">
       {/* 顶部 Banner */}
       <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 text-white px-5 pt-10 pb-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.15),transparent_60%)]" />
         <div className="relative">
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-2xl font-black tracking-tight">美团</span>
+            <span className="text-2xl font-black tracking-tight">小美</span>
             <span className="bg-white/20 border border-white/30 text-xs font-black px-2 py-0.5 rounded-full">行程协同</span>
           </div>
           <h1 className="text-xl font-black leading-snug mb-1">
@@ -241,31 +245,24 @@ export default function CollabPage() {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
             ✨ {cfg.label}的专属心愿
           </p>
-          <div className="space-y-3">
-            {cfg.options.map((opt) => {
+          <div className="flex flex-wrap gap-3">
+            {COMMON_OPTIONS.map((opt) => {
               const isChecked = !!checked[opt.key];
               return (
                 <label
                   key={opt.key}
-                  className={`flex items-start gap-4 p-4 rounded-2xl border-2 cursor-pointer transition-all select-none ${
+                  className={`flex items-center gap-2 px-4 py-3 rounded-2xl border-2 cursor-pointer transition-all select-none ${
                     isChecked ? `${cfg.border} ${cfg.bg}` : 'border-slate-200 bg-white hover:border-slate-300'
                   }`}
                 >
-                  <div className="pt-0.5">
-                    <input
-                      type="checkbox"
-                      checked={isChecked}
-                      onChange={() => toggle(opt.key)}
-                      className={`w-5 h-5 rounded-md ${cfg.accent}`}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                      <span>{opt.emoji}</span>
-                      <span>{opt.title}</span>
-                    </p>
-                    <p className="text-xs text-slate-400 font-medium mt-0.5 leading-normal">{opt.desc}</p>
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggle(opt.key)}
+                    className="hidden" // 隐藏原生 checkbox，因为已经通过边框和背景色表示了选中状态
+                  />
+                  <span className="text-lg">{opt.emoji}</span>
+                  <span className={`text-sm font-extrabold ${isChecked ? 'text-slate-900' : 'text-slate-600'}`}>{opt.title}</span>
                 </label>
               );
             })}
@@ -292,8 +289,7 @@ export default function CollabPage() {
           />
         </div>
 
-        {/* 提交按钮（Fixed底部） */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-100">
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur-md border-t border-slate-100 z-10">
           <button
             type="submit"
             disabled={submitting}
@@ -310,6 +306,7 @@ export default function CollabPage() {
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }
